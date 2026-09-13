@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+release/
+_tmp/
+_local/
+_ignore/

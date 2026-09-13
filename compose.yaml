@@ -1,0 +1,20 @@
+services:
+  buzz-apps:
+    image: ghcr.io/aicayzer/buzz-apps:${BUZZ_APPS_VERSION:-0.1.0-rc.1}
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8080:8080'
+    volumes:
+      - ${BUZZ_APPS_CONFIG_DIR:?Set BUZZ_APPS_CONFIG_DIR to an external directory}:/config
+      - buzz-apps-data:/data
+    environment:
+      BUZZ_APPS_CONFIG: /config/config.json
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  buzz-apps-data:

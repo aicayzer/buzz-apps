@@ -1,0 +1,17 @@
+name: Bug report
+description: Report behaviour that does not work as documented.
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Buzz Apps and Buzz versions, installation method, and operating system.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: What happened?
+      description: Include reproduction steps, expected behaviour, and redacted logs. Never include credentials or private repository content.
+    validations:
+      required: true

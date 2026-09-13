@@ -6,3 +6,5 @@ coverage/
 !.env.example
 *.sqlite*
 *.pem
+release/
+*.tgz
