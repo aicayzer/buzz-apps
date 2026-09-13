@@ -80,3 +80,5 @@ The reference is the [GitHub Slack integration documentation](https://github.com
 - **Private messages depend on Buzz access controls.** They are not end-to-end encrypted. Never paste credentials into a channel or DM.
 
 See [architecture](architecture.md) for delivery guarantees and [installation](install.md) for installation and updates.
+
+Label changes, title/body edits and pull request synchronisation update the existing notification without adding a thread reply. Significant state changes, comments and reviews retain their thread behaviour.

@@ -68,7 +68,9 @@ export function formatNotification(
       ? `${actor} commented:\n\n${plain(payload.comment.body)}\n\n[View comment](${link(payload.comment.html_url)})`
       : payload.review
         ? `${actor} reviewed: **${label(payload.review.state)}**\n\n${plain(payload.review.body)}\n\n[View review](${link(payload.review.html_url)})`
-        : action === 'opened'
+        : ['opened', 'edited', 'labeled', 'unlabeled', 'synchronize'].includes(
+              action,
+            )
           ? undefined
           : `${actor} ${label(issue.merged && action === 'closed' ? 'merged' : action.replaceAll('_', ' '))} [#${issue.number}](${link(issue.html_url)}).`;
     return {
