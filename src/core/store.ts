@@ -148,6 +148,13 @@ export class Store implements StoreApi {
       ),
     );
   }
+  secret<T>(space: string, key: string): T | undefined {
+    const value = this.get<string>(space, key);
+    return value ? this.open<T>(value) : undefined;
+  }
+  saveSecret(space: string, key: string, value: unknown): void {
+    this.set(space, key, this.seal(value));
+  }
   account(pubkey: string): Account | undefined {
     const value = this.get<string>('accounts', pubkey);
     return value ? this.open<Account>(value) : undefined;
