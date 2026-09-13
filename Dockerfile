@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim AS build
+FROM node:26-bookworm-slim AS build
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
@@ -8,7 +8,7 @@ COPY src ./src
 COPY apps ./apps
 RUN npm run build && npm prune --omit=dev
 
-FROM node:24-bookworm-slim
+FROM node:26-bookworm-slim
 ENV NODE_ENV=production BUZZ_APPS_CONFIG=/config/config.json
 WORKDIR /app
 COPY --from=build /build/dist ./dist
