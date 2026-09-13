@@ -1,0 +1,38 @@
+name: Publish npm
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag matching package.json
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run check
+      - run: npm run format:check
+      - name: Validate tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: node -e 'if("v"+require("./package.json").version!==process.env.RELEASE_TAG)process.exit(1)'
+      - name: Publish with npm trusted publishing
+        run: |
+          tag=latest
+          case "$(node -p 'require("./package.json").version')" in *-*) tag=next ;; esac
+          npm publish --provenance --access public --tag "$tag"

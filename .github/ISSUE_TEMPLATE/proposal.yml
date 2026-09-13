@@ -1,0 +1,15 @@
+name: App suggestion or proposal
+description: Suggest an app or propose a substantial behaviour change.
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should someone be able to do? Link the provider's official integration documentation where useful.
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Scope and maintenance
+      description: Describe any approach you have in mind and whether you would maintain the contribution.
