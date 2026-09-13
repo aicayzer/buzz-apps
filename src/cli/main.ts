@@ -23,14 +23,29 @@ import type { Config } from '../core/types.js';
 import { controlService, installService, serviceInstalled } from './service.js';
 import { rollbackRelease, updateRelease } from './releases.js';
 
+const packageUrl = [
+  new URL('../../package.json', import.meta.url),
+  new URL('../../../package.json', import.meta.url),
+].find((url) => existsSync(url))!;
+const packageVersion = JSON.parse(readFileSync(packageUrl, 'utf8'))
+  .version as string;
+
 const program = new Command()
+  .enablePositionalOptions()
   .name('buzz-apps')
   .description('Install and run community apps for Buzz.')
-  .version('0.1.0-rc.1')
-  .option('--config <path>', 'External configuration file', defaultConfigPath())
+  .version(packageVersion)
+  .option('--config <path>', 'External configuration file')
   .option('--json', 'Machine-readable output');
+let activeOptions: { config?: string; json?: boolean } = {};
+program.hook('preAction', (_root, command) => {
+  activeOptions = command.optsWithGlobals();
+});
 function options(): { config: string; json?: boolean } {
-  return program.opts();
+  return {
+    ...activeOptions,
+    config: activeOptions.config ?? defaultConfigPath(),
+  };
 }
 function output(value: unknown): void {
   console.log(JSON.stringify(value, null, options().json ? undefined : 2));
@@ -354,6 +369,16 @@ program
     await rollbackRelease(config());
     output({ restored: true });
   });
+// Keep shared flags valid before or after a subcommand while separating
+// the root version display from the update command's version selection.
+function sharedOptions(command: Command): void {
+  for (const child of command.commands) {
+    child.option('--config <path>', 'External configuration file');
+    child.option('--json', 'Machine-readable output');
+    sharedOptions(child);
+  }
+}
+sharedOptions(program);
 program.parseAsync().catch((error: unknown) => {
   output({ error: error instanceof Error ? error.message : 'Command failed.' });
   process.exitCode = 1;

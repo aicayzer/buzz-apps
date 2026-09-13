@@ -64,6 +64,26 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+test.each(['edited', 'labeled', 'unlabeled', 'synchronize'])(
+  'updates the parent without a new reply for %s metadata',
+  (action) => {
+    const result = formatNotification('pull_request', {
+      action,
+      repository: { full_name: 'example/repo' },
+      sender: { login: 'bot' },
+      pull_request: {
+        number: 1,
+        title: 'Update',
+        state: 'open',
+        html_url: 'https://github.com/example/repo/pull/1',
+        labels: [{ name: 'dependencies' }],
+      },
+    });
+    expect(result?.body).toContain('Labels: dependencies');
+    expect(result?.reply).toBeUndefined();
+  },
+);
+
 describe('command and access boundaries', () => {
   test('help reflects the sender account and keeps notification guidance on separate lines', async () => {
     const app = createGithubApp(context);
