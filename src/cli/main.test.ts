@@ -62,3 +62,25 @@ it.each(['setup', 'enable'] as const)(
     expect(process.exitCode).toBe(1);
   },
 );
+
+it.each([true, false])(
+  'routes update version and shared flags correctly (globals first: %s)',
+  async (globalsFirst) => {
+    const config = join(directory, 'missing-config.json');
+    const output = vi.spyOn(console, 'log').mockImplementation(() => {});
+    process.argv = [
+      process.execPath,
+      'buzz-apps',
+      ...(globalsFirst ? ['--config', config] : []),
+      'update',
+      '--version',
+      '0.1.0-rc.3',
+      ...(!globalsFirst ? ['--config', config] : []),
+    ];
+    await import('./main.js');
+    await vi.waitFor(() => expect(output).toHaveBeenCalled());
+    const result = JSON.parse(output.mock.calls.flat().join('\n'));
+    expect(result.error).toContain('missing-config.json');
+    expect(process.exitCode).toBe(1);
+  },
+);
