@@ -1,7 +1,7 @@
 {
   "name": "buzz-apps",
   "version": "0.1.0-rc.1",
-  "private": true,
+  "private": false,
   "type": "module",
   "description": "Community apps for Buzz, starting with GitHub.",
   "license": "MIT",
@@ -21,6 +21,7 @@
     "check": "npm run typecheck && npm run lint && npm test && npm run build"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^11.2.0",
     "better-sqlite3": "^13.0.3",
     "commander": "^15.0.0",
     "cron-parser": "^5.10.1",
@@ -44,5 +45,19 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.0",
     "vitest": "^5.0.0"
+  },
+  "files": [
+    "dist/",
+    "docs/",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aicayzer/buzz-apps.git"
   }
 }
