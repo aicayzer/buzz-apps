@@ -232,11 +232,9 @@ test('reminder preview validates access and inputs without saving a reminder', a
 });
 test('issue editing loads the real content with the linked account and allows clearing its body', async () => {
   const app = createGithubApp(ctx);
-  const request = vi
-    .fn()
-    .mockResolvedValue({
-      data: { title: 'Current title', body: 'Current description' },
-    });
+  const request = vi.fn().mockResolvedValue({
+    data: { title: 'Current title', body: 'Current description' },
+  });
   vi.spyOn(app.api, 'user').mockResolvedValue({ request } as any);
   const edit = vi
     .spyOn(app, 'editIssue')
