@@ -269,6 +269,32 @@ describe('Buzz signed delivery', () => {
 });
 
 describe('Buzz incoming history', () => {
+  it('advertises command eligibility for Desktop without claiming channel membership', async () => {
+    await client.start(async () => {});
+    const events = requests
+      .filter((r) => r.path === '/events')
+      .map((r) => r.body as Event)
+      .filter((e) => e.kind === 10100);
+    expect(events).toHaveLength(1);
+    expect(verifyEvent(events[0])).toBe(true);
+    expect(JSON.parse(events[0].content)).toMatchObject({
+      name: 'GitHub',
+      respond_to: 'anyone',
+    });
+    expect(JSON.parse(events[0].content)).not.toHaveProperty('channel_ids');
+    await client.close();
+    client = new BuzzClient(config, store, log);
+    queryHandler = (filters) =>
+      filters.some((f) => (f.kinds as number[])?.includes(10100)) ? events : [];
+    requests = [];
+    await client.start(async () => {});
+    expect(
+      requests.filter(
+        (r) => r.path === '/events' && (r.body as Event).kind === 10100,
+      ),
+    ).toHaveLength(0);
+  });
+
   it('provisions a new GitHub profile once and preserves an existing identity profile', async () => {
     existingProfile = false;
     await client.start(async () => {});

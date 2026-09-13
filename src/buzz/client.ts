@@ -435,11 +435,45 @@ export class BuzzClient implements BuzzTransport {
     this.store.delete(`${this.storagePrefix}.profile`, 'pending');
   }
 
+  private async ensureDirectory(): Promise<void> {
+    // Desktop authorises bot mentions through the signed agent directory,
+    // independently of channel membership and the ordinary display profile.
+    const existing = await this.query([
+      { kinds: [10100], authors: [this.pubkey], limit: 1 },
+    ]);
+    if (
+      existing.some(
+        (event) => event.kind === 10100 && event.pubkey === this.pubkey,
+      )
+    )
+      return;
+    let event = this.store.get<Event>(
+      `${this.storagePrefix}.directory`,
+      'pending',
+    );
+    if (!event) {
+      event = this.sign(
+        10100,
+        JSON.stringify({
+          name: this.appId === 'github' ? 'GitHub' : this.appId,
+          agent_type: 'bot',
+          respond_to: 'anyone',
+          capabilities: ['commands', 'notifications'],
+        }),
+        [],
+      );
+      this.store.set(`${this.storagePrefix}.directory`, 'pending', event);
+    }
+    await this.publish(event);
+    this.store.delete(`${this.storagePrefix}.directory`, 'pending');
+  }
+
   async start(onMessage: (message: Message) => Promise<void>): Promise<void> {
     if (!this.stopped) throw new Error('Buzz client is already running.');
     this.onMessage = onMessage;
     await this.ensureRelayIdentity();
     await this.ensureProfile();
+    await this.ensureDirectory();
     if (
       this.store.get<number>(`${this.storagePrefix}.state`, 'started') ===
       undefined
