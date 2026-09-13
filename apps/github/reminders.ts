@@ -1,3 +1,4 @@
+import { belongsToRepository } from './canonical.js';
 import { GithubInputError } from './errors.js';
 import { createHash } from 'node:crypto';
 import { CronExpressionParser } from 'cron-parser';
@@ -129,6 +130,7 @@ export async function reminderText(
         break;
     }
     for (const item of items) {
+      if (!belongsToRepository(target, item)) continue;
       if (
         reminder.minAgeHours &&
         Date.now() - Date.parse(item.created_at) <

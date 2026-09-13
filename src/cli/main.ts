@@ -14,7 +14,11 @@ import { homedir } from 'node:os';
 import { randomBytes } from 'node:crypto';
 import { createInterface } from 'node:readline/promises';
 import { generateSecretKey, getPublicKey } from 'nostr-tools';
-import { loadConfig, defaultConfigPath } from '../core/config.js';
+import {
+  loadConfig,
+  defaultConfigPath,
+  parseConfigurationJson,
+} from '../core/config.js';
 import type { Config } from '../core/types.js';
 import { controlService, installService, serviceInstalled } from './service.js';
 import { rollbackRelease, updateRelease } from './releases.js';
@@ -72,9 +76,9 @@ program
       return;
     }
     const input = args.input
-      ? (JSON.parse(
+      ? parseConfigurationJson<Partial<Config>>(
           readFileSync(resolve(args.input), 'utf8'),
-        ) as Partial<Config>)
+        )
       : {};
     let relayUrl = args.relay || input.relayUrl || process.env.BUZZ_RELAY_URL;
     let publicUrl =
@@ -153,9 +157,9 @@ program
       throw new Error('Unknown app. This release includes github.');
     const effective = config();
     const path = resolve(options().config);
-    const raw = JSON.parse(readFileSync(path, 'utf8')) as Config;
+    const raw = parseConfigurationJson<Config>(readFileSync(path, 'utf8'));
     const input = args.input
-      ? (JSON.parse(readFileSync(resolve(args.input), 'utf8')) as {
+      ? (parseConfigurationJson(readFileSync(resolve(args.input), 'utf8')) as {
           botKey?: string;
           authTag?: string;
           github?: Config['github'];
@@ -210,7 +214,7 @@ program
       throw new Error('Unknown app. This release includes github.');
     config();
     const path = resolve(options().config);
-    const raw = JSON.parse(readFileSync(path, 'utf8')) as Config;
+    const raw = parseConfigurationJson<Config>(readFileSync(path, 'utf8'));
     raw.enabledApps = raw.enabledApps.filter((id) => id !== app);
     writeConfig(path, raw);
     output({ enabledApps: raw.enabledApps, restartRequired: true });

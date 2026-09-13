@@ -1,3 +1,4 @@
+import { belongsToRepository } from './canonical.js';
 import { coversRepository } from './subscriptions.js';
 import type {
   AppContext,
@@ -45,6 +46,7 @@ export async function previewLinks(
         const repository = (
           await client.request('GET /repos/{owner}/{repo}', { owner, repo })
         ).data;
+        if (!belongsToRepository(target!, repository)) continue;
         privateRepo = repository.private;
         if (
           subscription &&
@@ -59,6 +61,7 @@ export async function previewLinks(
               { owner, repo, issue_number: Number(number) },
             )
           ).data;
+          if (!belongsToRepository(target!, issue)) continue;
           body = `**${label(target)}**\n[#${issue.number}: ${label(issue.title)}](${link(issue.html_url)})\n**${label(issue.state)}**\n\n${plain(issue.body, 500)}`;
           const comment = /^#issuecomment-(\d+)$/.exec(url.hash);
           if (comment) {
@@ -66,6 +69,7 @@ export async function previewLinks(
               'GET /repos/{owner}/{repo}/issues/comments/{comment_id}',
               { owner, repo, comment_id: Number(comment[1]) },
             );
+            if (!belongsToRepository(target!, result.data)) continue;
             body += `\n\n${label(result.data.user?.login)} commented:\n${plain(result.data.body, 500)}`;
           }
           const reviewComment = /^#discussion_r(\d+)$/.exec(url.hash);
@@ -74,6 +78,7 @@ export async function previewLinks(
               'GET /repos/{owner}/{repo}/pulls/comments/{comment_id}',
               { owner, repo, comment_id: Number(reviewComment[1]) },
             );
+            if (!belongsToRepository(target!, result.data)) continue;
             body += `\n\n${label(result.data.user?.login)} commented:\n${plain(result.data.body, 500)}`;
           }
           const review = /^#pullrequestreview-(\d+)$/.exec(url.hash);
@@ -87,6 +92,7 @@ export async function previewLinks(
                 review_id: Number(review[1]),
               },
             );
+            if (!belongsToRepository(target!, result.data)) continue;
             body += `\n\n${label(result.data.user?.login)}: ${label(result.data.state)}\n${plain(result.data.body, 500)}`;
           }
         } else if (kind === 'blob' && parts.length >= 5) {
@@ -112,6 +118,7 @@ export async function previewLinks(
             result.data.encoding !== 'base64'
           )
             continue;
+          if (!belongsToRepository(target!, result.data)) continue;
           const content = Buffer.from(result.data.content, 'base64').toString(
             'utf8',
           );

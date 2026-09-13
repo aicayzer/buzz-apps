@@ -1,3 +1,4 @@
+import { belongsToRepository } from './canonical.js';
 import { nip19 } from 'nostr-tools';
 import type { AppContext, Subscription } from '../../src/core/types.js';
 import type { GithubApi } from './api.js';
@@ -212,6 +213,23 @@ export async function deliverWebhook(
         linkedTeamLogins: members.map((member) => member.login),
       };
     }
+  }
+  const resourceTarget = String(payload.repository?.full_name ?? '');
+  const resources = [
+    current.issue,
+    current.pull_request,
+    current.comment,
+    current.review,
+    current.workflow_run,
+  ].filter(Boolean);
+  if (
+    resources.some((resource) => !belongsToRepository(resourceTarget, resource))
+  ) {
+    context.log.info(
+      { event },
+      'Skipped a GitHub resource outside its original repository',
+    );
+    return;
   }
   const notification = formatNotification(event, current);
   if (!notification) return;

@@ -670,3 +670,154 @@ describe('organisation approval and webhook replay', () => {
     expect(context.buzz.send).not.toHaveBeenCalled();
   });
 });
+
+describe('repository transfer publication boundary', () => {
+  test.each([
+    ['issues/1', 'issue'],
+    ['pull/1', 'issue'],
+    ['issues/1#issuecomment-22', 'comment'],
+    ['pull/1#discussion_r22', 'review-comment'],
+    ['pull/1#pullrequestreview-22', 'review'],
+  ])(
+    'a redirected %s cannot publish private content from another repository',
+    async (path, transferred) => {
+      const app = createGithubApp(context);
+      const request = vi.fn(async (route: string) => {
+        if (route === 'GET /repos/{owner}/{repo}')
+          return {
+            data: {
+              full_name: 'example/repo',
+              private: true,
+              html_url: 'https://github.com/example/repo',
+            },
+          };
+        if (route === 'GET /repos/{owner}/{repo}/issues/{issue_number}')
+          return {
+            data: {
+              number: 1,
+              title: 'Issue',
+              body:
+                transferred === 'issue'
+                  ? 'PRIVATE DESTINATION CONTENT'
+                  : 'Original issue',
+              html_url: `https://github.com/example/${transferred === 'issue' ? 'secret' : 'repo'}/issues/1`,
+              repository_url: `https://api.github.com/repos/example/${transferred === 'issue' ? 'secret' : 'repo'}`,
+            },
+          };
+        return {
+          data: {
+            id: 22,
+            body: 'PRIVATE DESTINATION CONTENT',
+            html_url:
+              'https://github.com/example/secret/issues/1#issuecomment-22',
+            url: 'https://api.github.com/repos/example/secret/issues/comments/22',
+          },
+        };
+      });
+      vi.spyOn(app.api, 'reader').mockResolvedValue({ request } as any);
+      await previewLinks(
+        context,
+        app.api,
+        { ...message, content: `https://github.com/example/repo/${path}` },
+        [sub],
+      );
+      expect(context.buzz.send).not.toHaveBeenCalled();
+      expect(context.buzz.dm).not.toHaveBeenCalled();
+      expect(store.list('github:previews')).toEqual([]);
+    },
+  );
+  test('an old-repository webhook cannot publish the latest transferred issue', async () => {
+    const app = createGithubApp(context);
+    const original = {
+      number: 1,
+      title: 'Original issue',
+      state: 'open',
+      html_url: 'https://github.com/example/repo/issues/1',
+    };
+    vi.spyOn(app.api, 'installation').mockResolvedValue({
+      request: vi.fn().mockResolvedValue({
+        data: {
+          ...original,
+          title: 'PRIVATE DESTINATION TITLE',
+          body: 'Private details',
+          html_url: 'https://github.com/example/secret/issues/2',
+          repository_url: 'https://api.github.com/repos/example/secret',
+        },
+      }),
+    } as any);
+    await deliverWebhook(
+      context,
+      app.api,
+      [sub],
+      'issues',
+      {
+        repository: {
+          full_name: 'example/repo',
+          name: 'repo',
+          owner: { login: 'example' },
+        },
+        issue: original,
+        action: 'transferred',
+      },
+      'transfer',
+    );
+    expect(context.buzz.send).not.toHaveBeenCalled();
+    expect(store.list('github:objects')).toEqual([]);
+  });
+  test('conflicting canonical URL fields fail closed even if one still names the subscribed repository', async () => {
+    const { belongsToRepository } = await import('./canonical.js');
+    expect(
+      belongsToRepository('example/repo', {
+        html_url: 'https://github.com/example/repo/issues/1',
+        repository_url: 'https://api.github.com/repos/example/secret',
+      }),
+    ).toBe(false);
+    expect(
+      belongsToRepository('example/repo', {
+        html_url: 'https://github.com/Example/Repo/issues/1',
+        url: 'https://api.github.com/repos/example/repo/issues/1',
+      }),
+    ).toBe(true);
+    expect(
+      belongsToRepository('example/repo', { title: 'No canonical identity' }),
+    ).toBe(false);
+  });
+});
+
+test('stale reminder search results cannot cross a repository transfer boundary', async () => {
+  const { reminderText } = await import('./reminders.js');
+  const app = createGithubApp(context);
+  vi.spyOn(app.api, 'account').mockResolvedValue({
+    pubkey: 'person',
+    login: 'someone',
+    token: 'fixture-token',
+  });
+  vi.spyOn(app.api, 'user').mockResolvedValue({
+    request: vi.fn().mockResolvedValue({
+      data: {
+        total_count: 1,
+        items: [
+          {
+            number: 2,
+            title: 'PRIVATE DESTINATION TITLE',
+            html_url: 'https://github.com/example/secret/pull/2',
+            repository_url: 'https://api.github.com/repos/example/secret',
+            labels: [],
+          },
+        ],
+      },
+    }),
+  } as any);
+  expect(
+    await reminderText(app.api, {
+      id: 'review',
+      author: 'person',
+      channel: 'channel',
+      repos: ['example/repo'],
+      timezone: 'UTC',
+      days: [1],
+      time: '09:00',
+      enabled: true,
+    }),
+  ).toBe('No pull requests match this review reminder.');
+});

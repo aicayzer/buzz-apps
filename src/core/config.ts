@@ -62,8 +62,22 @@ export function defaultConfigPath(): string {
     join(homedir(), '.config', 'buzz-apps', 'config.json')
   );
 }
+export function parseConfigurationJson<T = Record<string, unknown>>(
+  encoded: string,
+): T {
+  let value: unknown;
+  try {
+    value = JSON.parse(encoded);
+  } catch {
+    // Native JSON errors can quote fragments of credentials from the input.
+    throw new Error('Invalid configuration JSON. Check its syntax.');
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('Configuration JSON must contain an object.');
+  return value as T;
+}
 export function loadConfig(path = defaultConfigPath()): Config {
-  const raw = JSON.parse(readFileSync(path, 'utf8'));
+  const raw = parseConfigurationJson(readFileSync(path, 'utf8'));
   const overrides: Record<string, unknown> = {};
   if (raw.secretCommand) {
     const command = z.array(z.string().min(1)).min(1).parse(raw.secretCommand);
@@ -98,7 +112,9 @@ export function loadConfig(path = defaultConfigPath()): Config {
     if (process.env[env]) overrides[field] = process.env[env];
   }
   if (process.env.BUZZ_APPS_GITHUB_CONFIG)
-    overrides.github = JSON.parse(process.env.BUZZ_APPS_GITHUB_CONFIG);
+    overrides.github = parseConfigurationJson(
+      process.env.BUZZ_APPS_GITHUB_CONFIG,
+    );
   const config = schema.parse({ ...raw, ...overrides });
   if (process.env.BUZZ_APPS_GITHUB_BOT_KEY)
     config.identities.github = { botKey: process.env.BUZZ_APPS_GITHUB_BOT_KEY };

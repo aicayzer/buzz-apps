@@ -26,6 +26,25 @@ function write(value: unknown): string {
 }
 
 describe('external credential configuration', () => {
+  it('never includes malformed file or environment credentials in parsing errors', () => {
+    const secret = 'fixture-sensitive-token';
+    const malformed = `{"clientSecret":${secret}}`;
+    const path = join(directory, 'config.json');
+    writeFileSync(path, malformed);
+    expect(() => loadConfig(path)).toThrow(
+      'Invalid configuration JSON. Check its syntax.',
+    );
+    writeFileSync(path, JSON.stringify(base()));
+    vi.stubEnv('BUZZ_APPS_GITHUB_CONFIG', malformed);
+    try {
+      loadConfig(path);
+      throw new Error('Expected failure');
+    } catch (error) {
+      expect(String(error)).toContain('Invalid configuration JSON');
+      expect(String(error)).not.toContain('fixture-sensitive');
+    }
+  });
+
   it('requires an HTTPS public origin and rejects credentials, paths and query strings', () => {
     for (const publicUrl of [
       'http://public.example',
