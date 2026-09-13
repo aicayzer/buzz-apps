@@ -22,6 +22,12 @@ Repository maintainers review shared interfaces and publish releases. App mainta
 
 The first publication requires a maintainer's npm account. Build and inspect `npm pack --dry-run`, then publish the release candidate with `npm publish --access public --tag next`. Subsequent releases use the `Publish npm` workflow and npm trusted publishing.
 
-In npm's package settings, configure GitHub owner `aicayzer`, repository `buzz-apps`, workflow filename `npm-publish.yml` and environment `npm`. Allow direct `npm publish` for this workflow. Configure the matching GitHub environment, then run the workflow against an existing release tag. No npm token is stored in GitHub. The workflow publishes release candidates to `next` and stable releases to `latest`.
+After the first publication, npm 11.15.0 or newer can configure OIDC directly:
 
-These settings follow [npm's trusted publishing documentation](https://docs.npmjs.com/trusted-publishers/), checked September 2026. OIDC needs npm 11.5.1 or newer; Node.js 24 supplies a compatible npm version.
+```sh
+npm trust github buzz-apps --repo aicayzer/buzz-apps --file npm-publish.yml --env npm --allow-publish
+```
+
+Run this while signed in to the package owner's npm account with account-level 2FA enabled. The equivalent npm website settings are GitHub owner `aicayzer`, repository `buzz-apps`, workflow filename `npm-publish.yml` and environment `npm`, with direct publishing allowed. The GitHub environment must match. Subsequent workflow runs publish release candidates to `next` and stable releases to `latest`, without a stored npm token.
+
+These settings follow [npm's trusted publishing documentation](https://docs.npmjs.com/trusted-publishers/) and [npm trust command documentation](https://docs.npmjs.com/cli/v11/commands/npm-trust/), checked September 2026. The trust command requires an existing npm package; publish the initial release candidate first.
