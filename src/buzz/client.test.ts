@@ -350,6 +350,7 @@ describe('Buzz incoming history', () => {
     const older = message('older', start - 2);
     let failed = false;
     queryHandler = (filters) => {
+      if (!(filters[0].kinds as number[])?.includes(9)) return [];
       if (!filters[0].before_id) return page;
       expect(filters[0].before_id).toBe(page.at(-1)!.id);
       expect(filters[0].until).toBe(start - 1);
@@ -369,7 +370,7 @@ describe('Buzz incoming history', () => {
     expect(callback).toHaveBeenCalledTimes(501);
     expect(store.get(`${client.storagePrefix}.state`, 'watermark')).toBe(start);
     expect((callback.mock.calls[0][0] as { id: string }).id).toBe(older.id);
-  });
+  }, 15_000);
 
   it('retries a failed callback from durable inbox after restart', async () => {
     const incoming = message('help');

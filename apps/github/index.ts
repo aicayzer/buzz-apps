@@ -17,7 +17,7 @@ import { deliverWebhook } from './notifications.js';
 import { deliverReminders, saveReminder, type Reminder } from './reminders.js';
 import { previewLinks } from './previews.js';
 
-export const HELP = `**GitHub**\n\nConnect with \`@GitHub signin\`. Then use:\n- \`@GitHub subscribe OWNER/REPO [features]\`\n- \`@GitHub unsubscribe OWNER/REPO [features]\`\n- \`@GitHub subscribe list [features]\`\n- \`@GitHub settings\`\n- \`@GitHub open\`\n- \`@GitHub issue OWNER/REPO#NUMBER comment TEXT|edit|close|reopen\`\n- \`@GitHub workflow OWNER/REPO RUN_ID rerun [failed] [debug]\`\n- \`@GitHub deployment OWNER/REPO RUN_ID approve|reject ENVIRONMENT\`\n- \`@GitHub reminders\`\n- \`@GitHub signout\`\n\nDefault notifications: issues, pull requests, default-branch commits, releases and deployments. Optional: workflows, reviews, comments, branches and discussions. Filters include \`commits:BRANCH\`, \`+label:LABEL\`, \`name=WORKFLOW\`, \`event=EVENT\`, \`branch=BRANCH\` and \`actor=LOGIN\`. Use \`OWNER\` to subscribe to an organisation. Private repository subscriptions publish to the whole channel.`;
+export const HELP = `**GitHub**\n\n- \`@GitHub subscribe OWNER/REPO [features]\`\n- \`@GitHub unsubscribe OWNER/REPO [features]\`\n- \`@GitHub subscribe list [features]\`\n- \`@GitHub settings\`\n- \`@GitHub open\`\n- \`@GitHub issue OWNER/REPO#NUMBER comment TEXT|edit|close|reopen\`\n- \`@GitHub workflow OWNER/REPO RUN_ID rerun [failed] [debug]\`\n- \`@GitHub deployment OWNER/REPO RUN_ID approve|reject ENVIRONMENT\`\n- \`@GitHub reminders\`\n- \`@GitHub signout\`\n\n- **Default notifications:** issues, pull requests, default-branch commits, releases and deployments.\n- **Optional notifications:** workflows, reviews, comments, branches and discussions.\n- **Filters:** \`commits:BRANCH\`, \`+label:LABEL\`, \`name=WORKFLOW\`, \`event=EVENT\`, \`branch=BRANCH\` and \`actor=LOGIN\`.\n- **Organisations:** use \`OWNER\` to subscribe to an organisation.\n- **Private repositories:** subscriptions publish to the whole channel.\n\n**Account**\n- Use \`@GitHub signin\` to connect or reconnect your account.`;
 
 export function commandText(
   message: Message,
@@ -96,7 +96,15 @@ export class GithubApp implements BuzzApp {
       const tokens = parsed.slice(1);
       switch (command.toLowerCase()) {
         case 'help':
-          await this.reply(message, HELP);
+          await this.reply(
+            message,
+            this.context.store.account(message.author)
+              ? HELP.replace(
+                  '- Use `@GitHub signin` to connect or reconnect your account.',
+                  '- Your GitHub account is connected. Use `@GitHub signout` to disconnect.',
+                )
+              : HELP,
+          );
           break;
         case 'signin':
           await this.form('signin', message);

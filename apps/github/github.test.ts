@@ -65,6 +65,23 @@ afterEach(() => {
 });
 
 describe('command and access boundaries', () => {
+  test('help reflects the sender account and keeps notification guidance on separate lines', async () => {
+    const app = createGithubApp(context);
+    await app.onMessage(message);
+    expect(context.buzz.send).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.stringContaining('connect or reconnect'),
+      expect.anything(),
+    );
+    store.saveAccount({ pubkey: 'person', login: 'someone', token: 'token' });
+    await app.onMessage({ ...message, id: 'message-2' });
+    const text = vi.mocked(context.buzz.send).mock.calls.at(-1)![1];
+    expect(text).toContain('Your GitHub account is connected.');
+    expect(text).not.toContain('connect or reconnect');
+    expect(text).toContain('\n- **Default notifications:**');
+    expect(text).toContain('\n- **Optional notifications:**');
+  });
+
   test('requires a real tagged mention, not display text', () => {
     expect(commandText({ ...message, tags: [] }, 'bot')).toBeUndefined();
     expect(commandText(message, 'bot')).toBe('help');

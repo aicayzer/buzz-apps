@@ -14,7 +14,7 @@ Use signed Buzz authors for authority and the linked person's provider account f
 
 Use a focused branch and Conventional Commits. Explain the final behaviour and validation in the pull request. Substantial changes to existing behaviour need a proposal issue first; fixes and new apps can arrive directly as pull requests.
 
-CI runs on GitHub-hosted runners. Never add a public repository to a private or self-hosted runner pool. Release tags must match `package.json`; release automation publishes the archive, checksums and container image. Apps and the service version together.
+CI runs on GitHub-hosted runners. Never add a public repository to a private or self-hosted runner pool. Release tags must match `package.json`; release automation publishes the archive, checksums and container image. Apps and the service version together. Group related fixes into one patch release (or the next release candidate while testing). Use short GitHub release notes covering user-visible changes, fixes and any upgrade action; do not maintain a duplicate changelog.
 
 Repository maintainers review shared interfaces and publish releases. App maintainers review their provider behaviour and respond to relevant issues. Discussions are not required: use Issues and pull requests.
 
