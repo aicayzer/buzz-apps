@@ -34,6 +34,7 @@ const sub: Subscription = {
   features: ['issues'],
   settings: {
     threading: false,
+    broadcastUpdates: false,
     broadcastReviews: true,
     broadcastComments: true,
     previews: false,
@@ -93,6 +94,7 @@ test('settings hydrate stored toggles and saving an untouched form does not rese
   expect(posted).toEqual({
     target: 'example/repo',
     threading: 'false',
+    broadcastUpdates: 'false',
     broadcastReviews: 'true',
     broadcastComments: 'true',
     previews: 'false',

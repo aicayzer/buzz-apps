@@ -54,6 +54,13 @@ export async function localControl(
         });
         return;
       }
+      // Local commands do not arrive through relay channel admission checks.
+      // Restrict this operator interface to a manager of the supplied channel.
+      const channel = event.tags.find((t) => t[0] === 'channel')![1];
+      if (!(await ctx.buzz.canManage(channel, event.pubkey))) {
+        respond(403, { error: 'Channel management permission is required.' });
+        return;
+      }
       if (!ctx.store.once('local-control', event.id, event.created_at)) {
         respond(409, {
           error: 'Command already submitted. Inspect settings before retrying.',

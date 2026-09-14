@@ -77,6 +77,9 @@ test('real socket saves quietly, rejects replay and preserves channel permission
     expect(dm).not.toHaveBeenCalled();
     await expect(sendControl(dir, event)).rejects.toThrow('already submitted');
     canManage.mockResolvedValue(false);
+    await expect(sendControl(dir, signed('status'))).rejects.toThrow(
+      'Channel management permission is required',
+    );
     await expect(
       sendControl(
         dir,

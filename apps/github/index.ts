@@ -293,6 +293,7 @@ export class GithubApp implements BuzzApp {
       throw new GithubInputError('Subscribe to this repository first.');
     const allowed = [
       'threading',
+      'broadcastUpdates',
       'broadcastReviews',
       'broadcastComments',
       'previews',
@@ -303,7 +304,7 @@ export class GithubApp implements BuzzApp {
       )
     )
       throw new GithubInputError(
-        'Settings accept threading, broadcastReviews, broadcastComments and previews as booleans.',
+        'Settings accept threading, broadcastUpdates, broadcastReviews, broadcastComments and previews as booleans.',
       );
     subscription.settings = { ...subscription.settings, ...settings };
     this.context.store.set('subscriptions', key, subscription);

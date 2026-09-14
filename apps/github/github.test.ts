@@ -315,13 +315,13 @@ describe('notification filters and state', () => {
     );
     expect(context.buzz.send).toHaveBeenCalledWith(
       'channel',
-      expect.stringContaining('**Issue closed**'),
+      expect.stringContaining('), closed'),
       expect.objectContaining({ edit: 'event-1' }),
     );
     expect(context.buzz.send).toHaveBeenCalledWith(
       'channel',
       expect.stringContaining('closed'),
-      expect.objectContaining({ root: 'event-1', broadcast: true }),
+      expect.objectContaining({ root: 'event-1', broadcast: false }),
     );
   });
   test('escapes notification titles and never emits a hostile link', () => {
@@ -857,4 +857,153 @@ test('stale reminder search results cannot cross a repository transfer boundary'
       enabled: true,
     }),
   ).toBe('No pull requests match this review reminder.');
+});
+
+test('explicit no-preview metadata prevents even public repository requests', async () => {
+  const app = createGithubApp(context);
+  const reader = vi.spyOn(app.api, 'reader');
+  await previewLinks(
+    context,
+    app.api,
+    {
+      ...message,
+      content: 'https://github.com/example/repo',
+      tags: [['link-preview', 'none']],
+    },
+    [],
+  );
+  expect(reader).not.toHaveBeenCalled();
+  expect(context.buzz.send).not.toHaveBeenCalled();
+});
+test('release attribution remains literal and never becomes a Buzz ping', async () => {
+  const app = createGithubApp(context);
+  store.saveAccount({
+    pubkey: 'a'.repeat(64),
+    login: 'contributor',
+    token: 'fixture',
+  });
+  await deliverWebhook(
+    context,
+    app.api,
+    [{ ...sub, features: ['releases'] }],
+    'release',
+    {
+      action: 'published',
+      repository: { full_name: 'example/repo' },
+      release: {
+        id: 42,
+        name: 'v1',
+        body: 'Fix by @contributor in https://github.com/example/repo/pull/1',
+        html_url: 'https://github.com/example/repo/releases/tag/v1',
+      },
+    },
+    'release-mention',
+  );
+  expect(context.buzz.send).toHaveBeenCalledWith(
+    'channel',
+    expect.stringContaining('by @contributor'),
+    expect.objectContaining({ mentions: [] }),
+  );
+  expect(vi.mocked(context.buzz.send).mock.calls[0][1]).not.toContain(
+    'Mentioned:',
+  );
+});
+test('direct comment mentions use Buzz profile names only in the reply', async () => {
+  const app = createGithubApp(context);
+  const pubkey = 'a'.repeat(64);
+  store.saveAccount({ pubkey, login: 'contributor', token: 'fixture' });
+  vi.mocked(context.buzz.query).mockResolvedValue([
+    {
+      pubkey,
+      created_at: 10,
+      content: JSON.stringify({
+        display_name: 'Example Person',
+        name: 'example',
+      }),
+    },
+  ] as any);
+  await deliverWebhook(
+    context,
+    app.api,
+    [{ ...sub, features: ['comments'] }],
+    'issue_comment',
+    {
+      action: 'created',
+      repository: { full_name: 'example/repo' },
+      issue: {
+        number: 7,
+        title: 'Original Title',
+        state: 'open',
+        html_url: 'https://github.com/example/repo/issues/7',
+        assignees: [{ login: 'contributor' }],
+      },
+      comment: {
+        id: 17,
+        body: 'Please check this @contributor.',
+        html_url: 'https://github.com/example/repo/issues/7#issuecomment-17',
+      },
+      sender: { login: 'author' },
+    },
+    'direct-mention',
+  );
+  const calls = vi.mocked(context.buzz.send).mock.calls;
+  expect(calls[0][2]?.mentions).toEqual([]);
+  expect(calls[1][1]).toContain('Mentioned: @Example Person');
+  expect(calls[1][2]).toMatchObject({ root: 'event-1', mentions: [pubkey] });
+  expect(calls[1][1]).not.toContain('nostr:');
+});
+test('PR presentation has one bold headline and a linked unchanged title', () => {
+  const notification = formatNotification('pull_request', {
+    action: 'opened',
+    repository: { full_name: 'example/repo' },
+    pull_request: {
+      number: 7,
+      title: 'Keep My Title',
+      state: 'open',
+      html_url: 'https://github.com/example/repo/pull/7',
+      user: { login: 'author' },
+      base: { ref: 'main' },
+      head: { ref: 'feature' },
+    },
+  });
+  expect(notification?.body.match(/\*\*/g)).toHaveLength(2);
+  expect(notification?.body).toContain(
+    '**PR [Keep My Title](https://github.com/example/repo/pull/7)**',
+  );
+});
+
+test('lifecycle channel broadcast requires explicit subscription opt-in', async () => {
+  const app = createGithubApp(context);
+  const subscription = {
+    ...sub,
+    settings: { ...sub.settings, broadcastUpdates: true },
+  };
+  const issue = {
+    number: 8,
+    title: 'Lifecycle',
+    state: 'closed',
+    html_url: 'https://github.com/example/repo/issues/8',
+  };
+  store.set('github:objects', 'channel:example/repo:issue:8', {
+    id: 'original',
+    body: 'Before',
+  });
+  await deliverWebhook(
+    context,
+    app.api,
+    [subscription],
+    'issues',
+    {
+      repository: { full_name: 'example/repo' },
+      issue,
+      action: 'closed',
+      sender: { login: 'author' },
+    },
+    'opt-in',
+  );
+  expect(context.buzz.send).toHaveBeenCalledWith(
+    'channel',
+    expect.stringContaining('**Issue closed**'),
+    expect.objectContaining({ root: 'original', broadcast: true }),
+  );
 });

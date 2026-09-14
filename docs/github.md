@@ -24,18 +24,18 @@ Subscriptions publish to the whole channel, including notifications from private
 
 The defaults are issues, pull requests, commits to the default branch, releases and deployments. Supplying features when creating a subscription selects those features instead. Adding features to an existing subscription keeps its other features. A new label filter replaces the previous label filter.
 
-| Notification             | Behaviour                                                                                                                                                                  |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Issues and pull requests | A parent message reflects the latest GitHub state; subsequent changes appear in its thread. Closing, reopening and marking ready for review can broadcast a thread update. |
-| Comments and reviews     | Optional thread replies, with optional channel broadcasts. Edited comments update their existing message; deleted comments replace its text.                               |
-| Commits                  | Default branch by default; explicit branches or glob patterns supported. Up to eight commits appear in a message, with a link to the complete comparison.                  |
-| Workflows                | Run status updates edit one parent. Unfiltered subscriptions show pull request runs targeting the default branch. Name, event, branch and actor filters are supported.     |
-| Releases                 | Published releases, including prereleases.                                                                                                                                 |
-| Deployments              | Environment, ref and latest deployment status.                                                                                                                             |
-| Branches                 | Optional branch creation and deletion messages.                                                                                                                            |
-| Discussions              | Optional discussion updates and comments.                                                                                                                                  |
+| Notification             | Behaviour                                                                                                                                                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Issues and pull requests | A parent message reflects the latest GitHub state; subsequent changes appear in its thread. Closing, reopening and marking ready for review stay in the thread by default; lifecycle broadcasts are an explicit opt-in. |
+| Comments and reviews     | Optional thread replies, with optional channel broadcasts. Edited comments update their existing message; deleted comments replace its text.                                                                            |
+| Commits                  | Default branch by default; explicit branches or glob patterns supported. Up to eight commits appear in a message, with a link to the complete comparison.                                                               |
+| Workflows                | Run status updates edit one parent. Unfiltered subscriptions show pull request runs targeting the default branch. Name, event, branch and actor filters are supported.                                                  |
+| Releases                 | Published releases, including prereleases.                                                                                                                                                                              |
+| Deployments              | Environment, ref and latest deployment status.                                                                                                                                                                          |
+| Branches                 | Optional branch creation and deletion messages.                                                                                                                                                                         |
+| Discussions              | Optional discussion updates and comments.                                                                                                                                                                               |
 
-`@GitHub settings` opens a private browser link for threading, review broadcasts, comment broadcasts and previews. Subscription filters remain available through commands.
+`@GitHub settings` opens a private browser link for threading, lifecycle broadcasts, review broadcasts, comment broadcasts and previews. Subscription filters remain available through commands.
 
 ## Act as yourself
 
@@ -58,7 +58,7 @@ A lost response to a write is treated as uncertain. The service journals the ope
 
 ## Previews and reminders
 
-Pasted GitHub links can show repositories, user and organisation profiles, issues, pull requests, comments, reviews and selected code lines. Public previews can work without a linked account. Private previews use the posting person's access. A private preview appears in a channel only when the repository is covered by an enabled subscription; otherwise it goes privately to the sender. There are at most three previews per message and forty code lines per preview.
+Pasted GitHub links can show repositories, user and organisation profiles, issues, pull requests, comments, reviews and selected code lines. Public previews can work without a linked account. Private previews use the posting person's access. A private preview appears in a channel only when the repository is covered by an enabled subscription; otherwise it goes privately to the sender. There are at most three previews per message and forty code lines per preview. Buzz’s explicit `link-preview: none` preference is honoured. Quoted examples, fenced or indented code, and inline code do not trigger automatic previews.
 
 ```text
 @GitHub reminders
@@ -74,7 +74,7 @@ Review reminders support personal or channel destinations, repositories, timezon
 The reference is the [GitHub Slack integration documentation](https://github.com/integrations/slack), reviewed in September 2026. Behaviour is implemented directly against GitHub's APIs; this is not a repackaged Slack app.
 
 - **Buzz controls differ.** Use a real bot mention. Slack slash commands, interactive buttons, coloured attachments, columns and ephemeral replies are replaced with messages, threads and private browser links.
-- **Identity links are explicit.** GitHub accounts are linked through sign-in. Linked reviewers, assignees and requested team members can be mentioned in Buzz; people without a link cannot receive a Buzz mention.
+- **Identity links are explicit.** GitHub accounts are linked through sign-in. Explicit assignments, review requests and direct mentions in authored comments or newly opened issues can notify linked people. Buzz mentions use their Buzz profile display name and native mention presentation. Release credits and quoted/code examples do not cause pings, and ordinary actor attribution links to the GitHub profile. People without a linked account cannot receive a Buzz mention.
 - **Scope is GitHub.com.** GitHub Enterprise Server and Slack administration-specific controls are not implemented.
 - **Bounded output stays readable.** Long descriptions, commit lists, code selections and reminder results are summarised with links to GitHub. Reminder search observes GitHub's search limits.
 - **Private messages depend on Buzz access controls.** They are not end-to-end encrypted. Never paste credentials into a channel or DM.
@@ -124,3 +124,5 @@ The key file contains only the linked person's hex Buzz private key. Never put t
 ### Personal contribution coverage
 
 A GitHub App user token can return calendar totals beyond the repositories available to the app, while its detailed breakdown is narrower. The summary labels that limitation. For a full personal breakdown, an operator can supply `githubContributionTokens`, a map from Buzz public key to a GitHub personal token, through external configuration or the secret provider. The service verifies that the token belongs to the same linked GitHub account on every summary request. This optional credential is used only for personal contribution reads, never normal commands, repository access approvals or writes. Keep tokens out of Buzz messages and version control.
+
+The quiet local interface requires management permission for the supplied Buzz channel, including read-only status commands. The key identifies the linked person; filesystem access alone does not authorise channel access.

@@ -1,3 +1,4 @@
+import { activeProse } from './prose.js';
 import { belongsToRepository } from './canonical.js';
 import { coversRepository } from './subscriptions.js';
 import type {
@@ -14,9 +15,15 @@ export async function previewLinks(
   message: Message,
   subscriptions: Subscription[],
 ): Promise<void> {
+  if (
+    message.tags.some((tag) => tag[0] === 'link-preview' && tag[1] === 'none')
+  )
+    return;
   const urls = [
     ...new Set(
-      message.content.match(/https:\/\/github\.com\/[^\s<>\])]+/g) ?? [],
+      activeProse(message.content).match(
+        /https:\/\/github\.com\/[^\s<>\])]+/g,
+      ) ?? [],
     ),
   ].slice(0, 3);
   for (const raw of urls) {

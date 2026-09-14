@@ -1,5 +1,5 @@
 import { belongsToRepository } from './canonical.js';
-import { nip19 } from 'nostr-tools';
+import { activeProse } from './prose.js';
 import type { AppContext, Subscription } from '../../src/core/types.js';
 import type { GithubApi } from './api.js';
 import { matchesSubscription } from './subscriptions.js';
@@ -34,6 +34,11 @@ export function link(value: unknown): string {
     return 'https://github.com';
   }
 }
+export function actorLink(login: unknown): string {
+  return login
+    ? `[${label(login)}](${link('https://github.com/' + String(login))})`
+    : 'GitHub';
+}
 export function formatNotification(
   event: string,
   payload: any,
@@ -41,14 +46,17 @@ export function formatNotification(
   const repo = payload.repository?.full_name;
   if (!repo) return;
   const repository = `[${label(repo)}](${link('https://github.com/' + repo)})`;
-  const actor = label(payload.sender?.login ?? 'GitHub');
+  const actor = actorLink(payload.sender?.login);
   const action = String(payload.action ?? 'updated');
   const issue = payload.issue ?? payload.pull_request;
   const logins = [
-    payload.assignee?.login,
-    payload.requested_reviewer?.login,
-    ...(issue?.assignees ?? []).map((item: any) => item.login),
-    ...(issue?.requested_reviewers ?? []).map((item: any) => item.login),
+    ...(action === 'assigned' ? [payload.assignee?.login] : []),
+    ...(action === 'review_requested'
+      ? [payload.requested_reviewer?.login]
+      : []),
+    ...(action === 'opened'
+      ? (issue?.assignees ?? []).map((item: any) => item.login)
+      : []),
   ].filter(Boolean);
   if (
     issue &&
@@ -76,11 +84,7 @@ export function formatNotification(
             ? '🟢'
             : '🔀';
     const title = `${kind} #${issue.number}: ${label(issue.title)}`;
-    const heading =
-      state === 'draft'
-        ? 'Draft pull request'
-        : `${kind} ${state === 'open' ? 'opened' : label(state)}`;
-    const summary = `${icon} **${heading}**\n${repository} [#${issue.number}](${link(issue.html_url)})\n**${label(issue.title)}**${issue.user?.login ? `\n\n- **Author:** ${label(issue.user.login)}` : ''}${issue.base?.ref ? `\n- **Branch:** ${label(issue.head?.ref)} → ${label(issue.base.ref)}` : ''}${issue.labels?.length ? `\n- Labels: ${issue.labels.map((item: any) => label(item.name)).join(', ')}` : ''}`;
+    const summary = `${icon} **${kind === 'Pull request' ? 'PR' : 'Issue'} [${label(issue.title)}](${link(issue.html_url)})**\n${repository} [#${issue.number}](${link(issue.html_url)}), ${label(state)}${issue.user?.login ? `, opened by ${actorLink(issue.user.login)}` : ''}${issue.labels?.length ? `\nLabels: ${issue.labels.map((item: any) => label(item.name)).join(', ')}` : ''}`;
     let reply: string | undefined;
     if (payload.comment)
       reply = `💬 **${actor} commented**\n\n${plain(payload.comment.body)}\n\n[View comment](${link(payload.comment.html_url)})`;
@@ -98,9 +102,9 @@ export function formatNotification(
       )
     ) {
       if (action === 'review_requested')
-        reply = `👀 **Review requested**\n${actor} requested a review${payload.requested_reviewer?.login ? ' from **' + label(payload.requested_reviewer.login) + '**' : payload.requested_team?.name ? ' from **' + label(payload.requested_team.name) + '**' : ''}.`;
+        reply = `👀 **Review requested**\n${actor} requested a review${payload.requested_reviewer?.login ? ' from ' + actorLink(payload.requested_reviewer.login) : payload.requested_team?.name ? ' from ' + label(payload.requested_team.name) : ''}.`;
       else
-        reply = `${icon} **${action === 'ready_for_review' ? 'Ready for review' : kind + ' ' + label(issue.merged && action === 'closed' ? 'merged' : action.replaceAll('_', ' '))}**\nBy **${actor}**. [View #${issue.number}](${link(issue.html_url)})`;
+        reply = `${icon} **${action === 'ready_for_review' ? 'Ready for review' : kind + ' ' + label(issue.merged && action === 'closed' ? 'merged' : action.replaceAll('_', ' '))}**\nBy ${actor}. [View #${issue.number}](${link(issue.html_url)})`;
     }
     return {
       key: `${repo}:issue:${issue.number}`,
@@ -118,7 +122,7 @@ export function formatNotification(
     return {
       key: `${repo}:push:${payload.after}`,
       title: `${count} commits`,
-      body: `📦 **${count} commit${count === 1 ? '' : 's'} pushed**\n${repository}, ${label(String(payload.ref).replace('refs/heads/', ''))}\n\n${commits.map((c: any) => `- [${String(c.id).slice(0, 7)}](${link(c.url)}) ${label(String(c.message).split('\n')[0])}`).join('\n')}${count > 8 ? '\n- ' + (count - 8) + ' more commits.' : ''}\n\nPushed by **${actor}**. [Compare changes](${link(payload.compare)})`,
+      body: `📦 **${count} commit${count === 1 ? '' : 's'} pushed**\n${repository}, ${label(String(payload.ref).replace('refs/heads/', ''))}\n\n${commits.map((c: any) => `- [${String(c.id).slice(0, 7)}](${link(c.url)}) ${label(String(c.message).split('\n')[0])}`).join('\n')}${count > 8 ? '\n- ' + (count - 8) + ' more commits.' : ''}\n\nPushed by ${actor}. [Compare changes](${link(payload.compare)})`,
       url: link(payload.compare),
       logins: [],
     };
@@ -150,7 +154,7 @@ export function formatNotification(
     return {
       key: `${repo}:workflow:${run.id}`,
       title: label(run.name),
-      body: `${icon} **${label(run.name)} ${words[state] ?? label(state)}**\n${repository}\n\n- **Branch:** ${label(run.head_branch)}\n- **Run:** [#${run.run_number}](${link(run.html_url)})\n- **Triggered by:** ${label(run.actor?.login ?? payload.sender?.login)}`,
+      body: `${icon} **${label(run.name)} ${words[state] ?? label(state)}**\n${repository}\n\n- Branch: ${label(run.head_branch)}\n- Run: [#${run.run_number}](${link(run.html_url)})\n- Triggered by: ${actorLink(run.actor?.login ?? payload.sender?.login)}`,
       url: link(run.html_url),
       important: run.status === 'completed',
       logins: [],
@@ -192,7 +196,7 @@ export function formatNotification(
     return {
       key: `${repo}:deployment:${d.id}`,
       title: `Deployment to ${label(d.environment)}`,
-      body: `${state === 'success' ? '✅' : state === 'failure' || state === 'error' ? '❌' : '⏳'} **${heading} ${label(d.environment)}**\n${repository}\n\n- **Ref:** ${label(d.ref)}\n- **Status:** ${label(state)}${payload.deployment_status?.description ? '\n- ' + plain(payload.deployment_status.description) : ''}\n\n[View deployment](${link('https://github.com/' + repo + '/deployments')})`,
+      body: `${state === 'success' ? '✅' : state === 'failure' || state === 'error' ? '❌' : '⏳'} **${heading} ${label(d.environment)}**\n${repository}\n\n- Ref: ${label(d.ref)}\n- Status: ${label(state)}${payload.deployment_status?.description ? '\n- ' + plain(payload.deployment_status.description) : ''}\n\n[View deployment](${link('https://github.com/' + repo + '/deployments')})`,
       url: `https://github.com/${repo}/deployments`,
       logins: [],
     };
@@ -201,7 +205,7 @@ export function formatNotification(
     return {
       key: `${repo}:branch:${payload.ref}:${event}:${payload.sender?.id}`,
       title: 'Branch updated',
-      body: `🌿 **Branch ${event === 'create' ? 'created' : 'deleted'}**\n${repository}\n\n- **Branch:** ${label(payload.ref)}\n- **By:** ${actor}`,
+      body: `🌿 **Branch ${event === 'create' ? 'created' : 'deleted'}**\n${repository}\n\n- Branch: ${label(payload.ref)}\n- By: ${actor}`,
       url: `https://github.com/${repo}/branches`,
       logins: [],
     };
@@ -211,7 +215,7 @@ export function formatNotification(
     return {
       key: `${repo}:discussion:${d.number}`,
       title: label(d.title),
-      body: `💬 **Discussion ${label(d.state ?? action)}**\n${repository} [#${d.number}](${link(d.html_url)})\n**${label(d.title)}**`,
+      body: `💬 **Discussion ${label(d.state ?? action)}**\n${repository}\n[#${d.number}: ${label(d.title)}](${link(d.html_url)})`,
       url: link(d.html_url),
       reply: payload.comment
         ? `💬 **${actor} replied**\n\n${plain(payload.comment.body)}`
@@ -308,26 +312,49 @@ export async function deliverWebhook(
     .list<unknown>('accounts')
     .map((row) => context.store.account(row.key))
     .filter((account) => account !== undefined);
+  const authoredText =
+    current.comment?.body ??
+    current.review?.body ??
+    (current.action === 'opened'
+      ? (current.issue?.body ?? current.pull_request?.body)
+      : '') ??
+    '';
   const bodyMentions = [
-    ...[
-      notification.body,
-      notification.reply ?? '',
-      current.issue?.body ?? current.pull_request?.body ?? '',
-    ]
-      .join('\n')
-      .matchAll(/(?<![\w])@([a-z\d-]+)/gi),
+    ...activeProse(authoredText).matchAll(/(?<![\w/])@([a-z\d-]+)(?![\w])/gi),
   ].map((match) => match[1]);
   const logins = [
     ...notification.logins,
-    ...(current.linkedTeamLogins ?? []),
+    ...(current.action === 'review_requested'
+      ? (current.linkedTeamLogins ?? [])
+      : []),
     ...bodyMentions,
   ];
   const linked = accounts.filter((account) =>
     logins.some((login) => login.toLowerCase() === account.login.toLowerCase()),
   );
   const mentions = linked.map((account) => account.pubkey);
-  if (linked.length)
-    notification.body += `\n\n${linked.map((account) => `[${label(account.login)}](nostr:${nip19.npubEncode(account.pubkey)})`).join(', ')}`;
+  if (linked.length) {
+    const profiles = await context.buzz.query([
+      { kinds: [0], authors: mentions },
+    ]);
+    const names = linked.map((account) => {
+      const latest = profiles
+        .filter((profile) => profile.pubkey === account.pubkey)
+        .sort((a, b) => b.created_at - a.created_at)[0];
+      let name = account.pubkey;
+      try {
+        const profile = JSON.parse(latest?.content ?? '{}');
+        name =
+          String(profile.display_name || profile.name || name).trim() || name;
+      } catch {
+        /* Keep a bound key reference when profile metadata is unavailable. */
+      }
+      return '@' + label(name);
+    });
+    const suffix = '\n\nMentioned: ' + names.join(', ');
+    if (notification.reply) notification.reply += suffix;
+    else notification.body += suffix;
+  }
   const seenChannels = new Set<string>();
   for (const subscription of matching) {
     if (seenChannels.has(subscription.channel)) continue;
@@ -345,7 +372,10 @@ export async function deliverWebhook(
       parentId = await context.buzz.send(
         subscription.channel,
         notification.body,
-        { mentions, dedupKey: `github:${deliveryKey}:parent` },
+        {
+          mentions: notification.reply ? [] : mentions,
+          dedupKey: `github:${deliveryKey}:parent`,
+        },
       );
       context.store.set('github:objects', key, {
         id: parentId,
@@ -354,7 +384,7 @@ export async function deliverWebhook(
     } else if (existing.body !== notification.body) {
       await context.buzz.send(subscription.channel, notification.body, {
         edit: existing.id,
-        mentions,
+        mentions: [],
         dedupKey: `github:${deliveryKey}:edit`,
       });
       context.store.set('github:objects', key, {
@@ -364,7 +394,8 @@ export async function deliverWebhook(
     }
     if (notification.reply) {
       const broadcast =
-        notification.important ||
+        (notification.important &&
+          subscription.settings.broadcastUpdates === true) ||
         (event === 'pull_request_review' &&
           subscription.settings.broadcastReviews === true) ||
         (['issue_comment', 'pull_request_review_comment'].includes(event) &&

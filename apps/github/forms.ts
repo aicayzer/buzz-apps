@@ -265,6 +265,11 @@ export function createGithubForms(
               subscription.settings.threading !== false,
             ),
             booleanField(
+              'broadcastUpdates',
+              'Show closed, reopened and ready updates in the channel as well as their thread',
+              subscription.settings.broadcastUpdates === true,
+            ),
+            booleanField(
               'broadcastReviews',
               'Show reviews in the channel as well as their thread',
               subscription.settings.broadcastReviews === true,
@@ -537,6 +542,7 @@ export function createGithubForms(
           );
         await github.updateSettings(message, target, {
           threading: booleanValue(values, 'threading'),
+          broadcastUpdates: booleanValue(values, 'broadcastUpdates'),
           broadcastReviews: booleanValue(values, 'broadcastReviews'),
           broadcastComments: booleanValue(values, 'broadcastComments'),
           previews: booleanValue(values, 'previews'),
