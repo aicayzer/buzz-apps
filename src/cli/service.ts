@@ -111,6 +111,23 @@ export function installService(
     execFileSync('systemctl', ['--user', 'daemon-reload'], { stdio: 'pipe' });
   }
 }
+export function waitForUnload(
+  loaded: () => boolean,
+  pause: () => void = () => {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+  },
+): void {
+  // bootout may acknowledge before launchd removes the registration. Starting
+  // immediately can mistake that retiring job for an already-running service.
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (!loaded()) return;
+    pause();
+  }
+  throw new Error(
+    'The service is still unloading. Check launchd before starting or updating it.',
+  );
+}
+
 export function controlService(action: 'start' | 'stop' | 'restart'): void {
   if (!serviceInstalled())
     throw new Error('Service is not installed. Run buzz-apps service install.');
@@ -129,8 +146,17 @@ export function controlService(action: 'start' | 'stop' | 'restart'): void {
       loaded = false;
     }
     if (action === 'stop') {
-      if (loaded)
+      if (loaded) {
         execFileSync('launchctl', ['bootout', target], { stdio: 'pipe' });
+        waitForUnload(() => {
+          try {
+            execFileSync('launchctl', ['print', target], { stdio: 'pipe' });
+            return true;
+          } catch {
+            return false;
+          }
+        });
+      }
     } else if (!loaded)
       execFileSync('launchctl', ['bootstrap', domain, serviceFile()], {
         stdio: 'pipe',
