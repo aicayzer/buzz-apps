@@ -84,11 +84,7 @@ export function formatNotification(
             ? '🟢'
             : '🔀';
     const title = `${kind} #${issue.number}: ${label(issue.title)}`;
-    const heading =
-      state === 'draft'
-        ? 'Draft pull request'
-        : `${kind} ${state === 'open' ? 'opened' : label(state)}`;
-    const summary = `${icon} **${heading}**\n${repository}\n[#${issue.number}: ${label(issue.title)}](${link(issue.html_url)})${issue.user?.login ? `\n\n- Author: ${actorLink(issue.user.login)}` : ''}${issue.base?.ref ? `\n- Branch: ${label(issue.head?.ref)} → ${label(issue.base.ref)}` : ''}${issue.labels?.length ? `\n- Labels: ${issue.labels.map((item: any) => label(item.name)).join(', ')}` : ''}`;
+    const summary = `${icon} **${kind === 'Pull request' ? 'PR' : 'Issue'} [${label(issue.title)}](${link(issue.html_url)})**\n${repository} [#${issue.number}](${link(issue.html_url)}), ${label(state)}${issue.user?.login ? `, opened by ${actorLink(issue.user.login)}` : ''}${issue.labels?.length ? `\nLabels: ${issue.labels.map((item: any) => label(item.name)).join(', ')}` : ''}`;
     let reply: string | undefined;
     if (payload.comment)
       reply = `💬 **${actor} commented**\n\n${plain(payload.comment.body)}\n\n[View comment](${link(payload.comment.html_url)})`;
@@ -398,7 +394,8 @@ export async function deliverWebhook(
     }
     if (notification.reply) {
       const broadcast =
-        notification.important ||
+        (notification.important &&
+          subscription.settings.broadcastUpdates === true) ||
         (event === 'pull_request_review' &&
           subscription.settings.broadcastReviews === true) ||
         (['issue_comment', 'pull_request_review_comment'].includes(event) &&

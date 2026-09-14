@@ -24,18 +24,18 @@ Subscriptions publish to the whole channel, including notifications from private
 
 The defaults are issues, pull requests, commits to the default branch, releases and deployments. Supplying features when creating a subscription selects those features instead. Adding features to an existing subscription keeps its other features. A new label filter replaces the previous label filter.
 
-| Notification             | Behaviour                                                                                                                                                                  |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Issues and pull requests | A parent message reflects the latest GitHub state; subsequent changes appear in its thread. Closing, reopening and marking ready for review can broadcast a thread update. |
-| Comments and reviews     | Optional thread replies, with optional channel broadcasts. Edited comments update their existing message; deleted comments replace its text.                               |
-| Commits                  | Default branch by default; explicit branches or glob patterns supported. Up to eight commits appear in a message, with a link to the complete comparison.                  |
-| Workflows                | Run status updates edit one parent. Unfiltered subscriptions show pull request runs targeting the default branch. Name, event, branch and actor filters are supported.     |
-| Releases                 | Published releases, including prereleases.                                                                                                                                 |
-| Deployments              | Environment, ref and latest deployment status.                                                                                                                             |
-| Branches                 | Optional branch creation and deletion messages.                                                                                                                            |
-| Discussions              | Optional discussion updates and comments.                                                                                                                                  |
+| Notification             | Behaviour                                                                                                                                                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Issues and pull requests | A parent message reflects the latest GitHub state; subsequent changes appear in its thread. Closing, reopening and marking ready for review stay in the thread by default; lifecycle broadcasts are an explicit opt-in. |
+| Comments and reviews     | Optional thread replies, with optional channel broadcasts. Edited comments update their existing message; deleted comments replace its text.                                                                            |
+| Commits                  | Default branch by default; explicit branches or glob patterns supported. Up to eight commits appear in a message, with a link to the complete comparison.                                                               |
+| Workflows                | Run status updates edit one parent. Unfiltered subscriptions show pull request runs targeting the default branch. Name, event, branch and actor filters are supported.                                                  |
+| Releases                 | Published releases, including prereleases.                                                                                                                                                                              |
+| Deployments              | Environment, ref and latest deployment status.                                                                                                                                                                          |
+| Branches                 | Optional branch creation and deletion messages.                                                                                                                                                                         |
+| Discussions              | Optional discussion updates and comments.                                                                                                                                                                               |
 
-`@GitHub settings` opens a private browser link for threading, review broadcasts, comment broadcasts and previews. Subscription filters remain available through commands.
+`@GitHub settings` opens a private browser link for threading, lifecycle broadcasts, review broadcasts, comment broadcasts and previews. Subscription filters remain available through commands.
 
 ## Act as yourself
 

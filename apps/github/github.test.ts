@@ -315,13 +315,13 @@ describe('notification filters and state', () => {
     );
     expect(context.buzz.send).toHaveBeenCalledWith(
       'channel',
-      expect.stringContaining('**Issue closed**'),
+      expect.stringContaining('), closed'),
       expect.objectContaining({ edit: 'event-1' }),
     );
     expect(context.buzz.send).toHaveBeenCalledWith(
       'channel',
       expect.stringContaining('closed'),
-      expect.objectContaining({ root: 'event-1', broadcast: true }),
+      expect.objectContaining({ root: 'event-1', broadcast: false }),
     );
   });
   test('escapes notification titles and never emits a hostile link', () => {
@@ -968,6 +968,42 @@ test('PR presentation has one bold headline and a linked unchanged title', () =>
   });
   expect(notification?.body.match(/\*\*/g)).toHaveLength(2);
   expect(notification?.body).toContain(
-    '[#7: Keep My Title](https://github.com/example/repo/pull/7)',
+    '**PR [Keep My Title](https://github.com/example/repo/pull/7)**',
+  );
+});
+
+test('lifecycle channel broadcast requires explicit subscription opt-in', async () => {
+  const app = createGithubApp(context);
+  const subscription = {
+    ...sub,
+    settings: { ...sub.settings, broadcastUpdates: true },
+  };
+  const issue = {
+    number: 8,
+    title: 'Lifecycle',
+    state: 'closed',
+    html_url: 'https://github.com/example/repo/issues/8',
+  };
+  store.set('github:objects', 'channel:example/repo:issue:8', {
+    id: 'original',
+    body: 'Before',
+  });
+  await deliverWebhook(
+    context,
+    app.api,
+    [subscription],
+    'issues',
+    {
+      repository: { full_name: 'example/repo' },
+      issue,
+      action: 'closed',
+      sender: { login: 'author' },
+    },
+    'opt-in',
+  );
+  expect(context.buzz.send).toHaveBeenCalledWith(
+    'channel',
+    expect.stringContaining('**Issue closed**'),
+    expect.objectContaining({ root: 'original', broadcast: true }),
   );
 });
