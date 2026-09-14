@@ -1,3 +1,5 @@
+import { saveSummary, summaryText, type Summary } from './summaries.js';
+import { effectiveTimezone, timezoneLabel } from '../../src/core/timezone.js';
 import { FormInputError } from '../../src/core/web.js';
 import { friendlyError } from './api.js';
 import { GithubInputError } from './errors.js';
@@ -109,6 +111,119 @@ export function createGithubForms(
   const handler: FormHandler = {
     async fields(record): Promise<Form> {
       const { message, data } = record;
+      if (record.purpose === 'summaries') {
+        const saved = data.id
+          ? ctx.store.get<Summary>(
+              'github:summaries',
+              `${message.author}:${data.id}`,
+            )
+          : undefined;
+        if (data.id && !saved)
+          throw new GithubInputError('This summary no longer exists.');
+        if (
+          saved?.channel &&
+          (saved.channel !== message.channel ||
+            !(await ctx.buzz.canManage(saved.channel, message.author)))
+        )
+          throw new GithubInputError(
+            'Open this summary from its destination channel.',
+          );
+        return {
+          title: saved ? 'Edit activity summary' : 'Create activity summary',
+          fields: [
+            {
+              name: 'id',
+              label: 'Name',
+              value: saved?.id ?? '',
+              required: true,
+              readonly: !!saved,
+            },
+            {
+              name: 'cadence',
+              label: 'Frequency',
+              value: saved?.cadence ?? 'daily',
+              required: true,
+              options: choices(['daily', 'Daily'], ['weekly', 'Weekly']),
+            },
+            {
+              name: 'enabled',
+              label: 'Status',
+              value: String(saved?.enabled ?? true),
+              required: true,
+              options: choices(['true', 'Enabled'], ['false', 'Disabled']),
+            },
+            {
+              name: 'scope',
+              label: 'Scope',
+              value: saved?.scope ?? 'personal',
+              required: true,
+              options: choices(
+                ['personal', 'My contributions'],
+                ['repositories', 'Repositories'],
+                ['organisation', 'Organisation'],
+              ),
+            },
+            {
+              name: 'targets',
+              label:
+                'Repositories (comma separated) or organisation, blank for personal',
+              value: saved?.targets.join(', ') ?? '',
+            },
+            {
+              name: 'destination',
+              label: 'Send to',
+              value: saved?.channel ? 'channel' : 'personal',
+              options: choices(
+                ['personal', 'Me privately'],
+                ['channel', 'This channel, including private activity'],
+              ),
+              required: true,
+            },
+            {
+              name: 'time',
+              label: `Time (${timezoneLabel(effectiveTimezone(ctx.config, saved?.timezone))})`,
+              type: 'time',
+              value: saved?.time ?? '09:00',
+              required: true,
+            },
+            {
+              name: 'weekday',
+              label: 'Day for weekly summaries',
+              value: String(saved?.weekday ?? 1),
+              options: [
+                'Sunday',
+                'Monday',
+                'Tuesday',
+                'Wednesday',
+                'Thursday',
+                'Friday',
+                'Saturday',
+              ].map((label, value) => ({ label, value: String(value) })),
+              required: true,
+            },
+            {
+              name: 'timezone',
+              label: 'Timezone override (blank uses the service default)',
+              value: saved?.timezone ?? '',
+            },
+            booleanField(
+              'skipEmpty',
+              'Skip empty periods',
+              saved?.skipEmpty ?? true,
+            ),
+            {
+              name: 'action',
+              label: 'Action',
+              value: 'save',
+              options: choices(
+                ['save', 'Save summary'],
+                ['preview', 'Preview summary'],
+              ),
+              required: true,
+            },
+          ],
+        };
+      }
       if (record.purpose === 'settings') {
         await github.manage(message);
         const subscriptions = github.subscriptions(message.channel);
@@ -285,9 +400,8 @@ export function createGithubForms(
           },
           {
             name: 'timezone',
-            label: 'Timezone',
-            value: reminder?.timezone ?? 'UTC',
-            required: true,
+            label: 'Timezone override (leave blank for service default)',
+            value: reminder?.timezone ?? '',
           },
           {
             name: 'time',
@@ -355,6 +469,48 @@ export function createGithubForms(
     },
     async submit(record, values) {
       const message = record.message;
+      if (record.purpose === 'summaries') {
+        if (record.data.id && record.data.id !== values.id)
+          throw new GithubInputError(
+            'The summary name cannot change while editing.',
+          );
+        if (
+          !['personal', 'channel'].includes(values.destination) ||
+          !['save', 'preview'].includes(values.action)
+        )
+          throw new GithubInputError('Choose a destination and action.');
+        const input = {
+          id: values.id,
+          author: message.author,
+          cadence: values.cadence,
+          scope: values.scope,
+          targets: values.targets
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean),
+          channel:
+            values.destination === 'channel' ? message.channel : undefined,
+          time: values.time,
+          weekday: Number(values.weekday),
+          timezone: values.timezone,
+          enabled: booleanValue(values, 'enabled'),
+          skipEmpty: booleanValue(values, 'skipEmpty'),
+          lastAt: Date.now(),
+        } as Summary;
+        if (values.action === 'preview') {
+          const { validateSummary } = await import('./summaries.js');
+          return (
+            await summaryText(
+              github.api,
+              await validateSummary(ctx, github.api, message, input),
+              ctx.config,
+            )
+          ).body;
+        }
+        await saveSummary(ctx, github.api, message, input);
+        return 'Activity summary saved.';
+      }
+
       if (record.purpose === 'open')
         return `Issue created: ${await github.createIssue(message, { target: values.target, title: values.title, body: values.body })}`;
       if (record.purpose === 'issue-edit') {
@@ -414,7 +570,8 @@ export function createGithubForms(
   }
   return {
     isPreview: (record, values) =>
-      record.purpose === 'reminders' && values.action === 'preview',
+      ['reminders', 'summaries'].includes(record.purpose) &&
+      values.action === 'preview',
     fields: (record) => safely(() => handler.fields(record)),
     submit: (record, values) => safely(() => handler.submit(record, values)),
   };

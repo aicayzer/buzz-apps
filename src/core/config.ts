@@ -3,9 +3,24 @@ import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
+import { validTimezone } from './timezone.js';
 import type { Config } from './types.js';
 
 const schema = z.object({
+  githubContributionTokens: z
+    .record(z.string().regex(/^[a-f\d]{64}$/i), z.string().min(1))
+    .optional(),
+  timezone: z
+    .string()
+    .refine((v) => {
+      try {
+        validTimezone(v);
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'Invalid timezone')
+    .default('UTC'),
   secretCommand: z.array(z.string().min(1)).min(1).optional(),
   githubCredentialsWriter: z
     .string()
@@ -91,6 +106,7 @@ export function loadConfig(path = defaultConfigPath()): Config {
       const values = z
         .object({
           encryptionKey: z.unknown().optional(),
+          githubContributionTokens: z.unknown().optional(),
           identities: z.unknown().optional(),
           github: z.unknown().optional(),
         })

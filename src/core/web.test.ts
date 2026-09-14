@@ -80,9 +80,7 @@ describe('private browser flows', () => {
         },
         payload: `csrf=csrf-token&action=${action}`,
       });
-    expect((await submit('preview')).body).toContain(
-      'Back to reminder settings',
-    );
+    expect((await submit('preview')).body).toContain('Back to settings');
     expect(f.store.get('web:sessions', key)).toBeDefined();
     expect((await submit('invalid')).statusCode).toBe(400);
     expect(f.store.get('web:sessions', key)).toBeDefined();

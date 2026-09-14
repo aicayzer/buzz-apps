@@ -1,3 +1,13 @@
+import { effectiveTimezone, timezoneLabel } from '../../src/core/timezone.js';
+import {
+  channelLink,
+  repoLink,
+  saveSummary,
+  summaryText,
+  summarySchedule,
+  deliverSummaries,
+  type Summary,
+} from './summaries.js';
 import { GithubInputError } from './errors.js';
 import { createHash } from 'node:crypto';
 import type {
@@ -17,7 +27,7 @@ import { deliverWebhook } from './notifications.js';
 import { deliverReminders, saveReminder, type Reminder } from './reminders.js';
 import { previewLinks } from './previews.js';
 
-export const HELP = `**GitHub**\n\n- \`@GitHub subscribe OWNER/REPO [features]\`\n- \`@GitHub unsubscribe OWNER/REPO [features]\`\n- \`@GitHub subscribe list [features]\`\n- \`@GitHub settings\`\n- \`@GitHub open\`\n- \`@GitHub issue OWNER/REPO#NUMBER comment TEXT|edit|close|reopen\`\n- \`@GitHub workflow OWNER/REPO RUN_ID rerun [failed] [debug]\`\n- \`@GitHub deployment OWNER/REPO RUN_ID approve|reject ENVIRONMENT\`\n- \`@GitHub reminders\`\n- \`@GitHub signout\`\n\n- **Default notifications:** issues, pull requests, default-branch commits, releases and deployments.\n- **Optional notifications:** workflows, reviews, comments, branches and discussions.\n- **Filters:** \`commits:BRANCH\`, \`+label:LABEL\`, \`name=WORKFLOW\`, \`event=EVENT\`, \`branch=BRANCH\` and \`actor=LOGIN\`.\n- **Organisations:** use \`OWNER\` to subscribe to an organisation.\n- **Private repositories:** subscriptions publish to the whole channel.\n\n**Account**\n- Use \`@GitHub signin\` to connect or reconnect your account.`;
+export const HELP = `**GitHub**\n\n- \`@GitHub status\`\n- \`@GitHub summaries\`\n\n- \`@GitHub subscribe OWNER/REPO [features]\`\n- \`@GitHub unsubscribe OWNER/REPO [features]\`\n- \`@GitHub subscribe list [features]\`\n- \`@GitHub settings\`\n- \`@GitHub open\`\n- \`@GitHub issue OWNER/REPO#NUMBER comment TEXT|edit|close|reopen\`\n- \`@GitHub workflow OWNER/REPO RUN_ID rerun [failed] [debug]\`\n- \`@GitHub deployment OWNER/REPO RUN_ID approve|reject ENVIRONMENT\`\n- \`@GitHub reminders\`\n- \`@GitHub signout\`\n\n- **Default notifications:** issues, pull requests, default-branch commits, releases and deployments.\n- **Optional notifications:** workflows, reviews, comments, branches and discussions.\n- **Filters:** \`commits:BRANCH\`, \`+label:LABEL\`, \`name=WORKFLOW\`, \`event=EVENT\`, \`branch=BRANCH\` and \`actor=LOGIN\`.\n- **Organisations:** use \`OWNER\` to subscribe to an organisation.\n- **Private repositories:** subscriptions publish to the whole channel.\n\n**Account**\n- Use \`@GitHub signin\` to connect or reconnect your account.`;
 
 export function commandText(
   message: Message,
@@ -62,7 +72,8 @@ export class GithubApp implements BuzzApp {
     });
   }
   private async form(
-    purpose: 'signin' | 'settings' | 'open' | 'reminders' | 'issue-edit',
+    purpose:
+      'signin' | 'settings' | 'open' | 'reminders' | 'issue-edit' | 'summaries',
     message: Message,
     data: Record<string, unknown> = {},
   ): Promise<void> {
@@ -73,7 +84,7 @@ export class GithubApp implements BuzzApp {
     const url = await this.context.link(purpose, message, data);
     await this.notify(
       message,
-      `[${purpose === 'signin' ? 'Sign in to GitHub' : 'Open GitHub settings'}](${url})\n\nThis link expires. Open it yourself; do not forward it.`,
+      `[${{ signin: 'Sign in to GitHub', settings: 'Change notification settings', open: 'Create an issue', reminders: 'Configure review reminders', 'issue-edit': 'Edit the issue', summaries: 'Configure activity summaries' }[purpose]}](${url})\n\nThis link expires. Open it yourself; do not forward it.`,
     );
     await this.reply(message, 'I sent you a private link.');
   }
@@ -138,6 +149,16 @@ export class GithubApp implements BuzzApp {
             ...(tokens[0] ? { target: tokens[0] } : {}),
           });
           break;
+        case 'status':
+          await this.notify(message, await this.status(message));
+          await this.reply(
+            message,
+            'Your GitHub setup has been sent privately.',
+          );
+          break;
+        case 'summaries':
+          await this.summaries(message, tokens);
+          break;
         case 'reminders':
           await this.reminders(message, tokens);
           break;
@@ -173,7 +194,7 @@ export class GithubApp implements BuzzApp {
           ? list
               .map(
                 (sub) =>
-                  `- **${sub.target}**${tokens[1] === 'features' ? `: ${sub.features.join(', ')}${Object.keys(sub.settings.filters ?? {}).length ? `; filters: ${JSON.stringify(sub.settings.filters)}` : ''}` : ''}`,
+                  `- ${repoLink(sub.target)}${tokens[1] === 'features' ? `: ${sub.features.join(', ')}${Object.keys(sub.settings.filters ?? {}).length ? `; filters: ${JSON.stringify(sub.settings.filters)}` : ''}` : ''}`,
               )
               .join('\n')
           : 'This channel has no GitHub subscriptions.',
@@ -218,7 +239,7 @@ export class GithubApp implements BuzzApp {
     this.context.store.set('subscriptions', key, subscription);
     await this.reply(
       message,
-      `Subscribed to **${target}**: ${features.join(', ')}. Notifications, including private repository information, will be shared with this channel.`,
+      `**Notifications enabled**\n\n- **Repository:** ${repoLink(target)}\n- **Channel:** ${await channelLink(this.context, message.channel)}\n- **Events:** ${features.map((f) => (f === 'pulls' ? 'pull requests' : f)).join(', ')}.\n\nPrivate repository notifications are shared with everyone in this channel.`,
     );
   }
   async unsubscribe(message: Message, tokens: string[]): Promise<void> {
@@ -250,7 +271,10 @@ export class GithubApp implements BuzzApp {
       }
       this.context.store.set('subscriptions', key, subscription);
     }
-    await this.reply(message, `Updated notifications for **${target}**.`);
+    await this.reply(
+      message,
+      `**Notifications updated**\n${repoLink(target)} in ${await channelLink(this.context, message.channel)}.`,
+    );
   }
   async updateSettings(
     message: Message,
@@ -357,7 +381,7 @@ export class GithubApp implements BuzzApp {
           ? rows
               .map(
                 (reminder) =>
-                  `- **${reminder.id}**: ${reminder.enabled ? 'enabled' : 'disabled'}, ${reminder.time} ${reminder.timezone}, ${reminder.channel ? 'channel' : 'personal'}`,
+                  `- **${reminder.id}**: ${reminder.enabled ? 'Enabled' : 'Disabled'}, ${reminder.time} (${timezoneLabel(effectiveTimezone(this.context.config, reminder.timezone))}), ${reminder.channel ? 'channel' : 'personal'}`,
               )
               .join('\n')
           : 'You have no review reminders.',
@@ -597,6 +621,106 @@ export class GithubApp implements BuzzApp {
       `Deployment ${action === 'approve' ? 'approved' : 'rejected'}.`,
     );
   }
+  async status(message: Message): Promise<string> {
+    const account = this.context.store.account(message.author);
+    const lines = [
+      '**Your GitHub setup**',
+      '',
+      '👤 **Account**',
+      account
+        ? `Connected as **${account.login}**.`
+        : 'Not connected. Use `@GitHub signin`.',
+      '',
+      '📬 **Notifications**',
+    ];
+    for (const sub of this.subscriptions()) {
+      if (
+        sub.channel !== message.channel &&
+        !(await this.context.buzz.canManage(sub.channel, message.author))
+      )
+        continue;
+      lines.push(
+        `- ${await channelLink(this.context, sub.channel)}: ${repoLink(sub.target)}, ${sub.features.map((f) => (f === 'pulls' ? 'pull requests' : f)).join(', ')}.`,
+      );
+    }
+    if (lines.at(-1) === '📬 **Notifications**')
+      lines.push('No subscriptions to show.');
+    lines.push('', '📊 **Summaries**');
+    for (const { key, value: s } of this.context.store.list<Summary>(
+      'github:summaries',
+    )) {
+      if (
+        s.author !== message.author &&
+        (!s.channel ||
+          !(await this.context.buzz.canManage(s.channel, message.author)))
+      )
+        continue;
+      lines.push(
+        `- **${s.id}:** ${summarySchedule(s, this.context.config)}. ${s.channel ? await channelLink(this.context, s.channel) : 'Private'}. Scope: ${s.scope === 'personal' ? 'personal contributions' : s.targets.map(repoLink).join(', ')}.${this.context.store.get('github:summary-errors', key) ? ' Delivery needs attention.' : ''}`,
+      );
+    }
+    if (lines.at(-1) === '📊 **Summaries**')
+      lines.push('No activity summaries configured.');
+    lines.push(
+      '',
+      'Use `@GitHub summaries` to configure a summary or `@GitHub settings` for notification delivery.',
+    );
+    return lines.join('\n');
+  }
+  private async summaries(message: Message, tokens: string[]): Promise<void> {
+    const [action, id, ...rest] = tokens;
+    if (!action) {
+      await this.api.account(message.author);
+      await this.form('summaries', message);
+      return;
+    }
+    if (action === 'list') {
+      await this.notify(message, await this.status(message));
+      return;
+    }
+    if (action === 'set') {
+      const input = JSON.parse(rest.join(' ')) as Summary;
+      await saveSummary(this.context, this.api, message, { ...input, id });
+      await this.reply(
+        message,
+        `**Summary saved**\n${id}: ${summarySchedule(this.context.store.get<Summary>('github:summaries', `${message.author}:${id}`)!, this.context.config)}.`,
+      );
+      return;
+    }
+    const key = `${message.author}:${id ?? action}`;
+    const summary = this.context.store.get<Summary>('github:summaries', key);
+    if (!summary)
+      throw new GithubInputError(
+        'That summary does not exist. Use @GitHub summaries to create one.',
+      );
+    if (
+      summary.channel &&
+      (summary.channel !== message.channel ||
+        !(await this.context.buzz.canManage(summary.channel, message.author)))
+    )
+      throw new GithubInputError(
+        'Manage this summary from its destination channel.',
+      );
+    if (action === 'delete') {
+      this.context.store.delete('github:summaries', key);
+      this.context.store.delete('github:summary-errors', key);
+      await this.reply(message, '**Summary removed**');
+      return;
+    }
+    if (action === 'preview') {
+      await this.notify(
+        message,
+        (await summaryText(this.api, summary, this.context.config)).body,
+      );
+      await this.reply(message, 'The summary preview has been sent privately.');
+      return;
+    }
+    if (id)
+      throw new GithubInputError(
+        'Use summaries, summaries NAME, summaries list, summaries preview NAME or summaries delete NAME.',
+      );
+    await this.form('summaries', message, { id: action });
+  }
   async onWebhook(
     event: string,
     payload: unknown,
@@ -613,6 +737,7 @@ export class GithubApp implements BuzzApp {
   }
   async tick(): Promise<void> {
     await deliverReminders(this.context, this.api);
+    await deliverSummaries(this.context, this.api);
   }
 }
 export function createGithubApp(context: AppContext): GithubApp {

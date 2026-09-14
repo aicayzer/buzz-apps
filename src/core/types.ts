@@ -1,5 +1,7 @@
 import type { Event } from 'nostr-tools';
 export interface Config {
+  timezone?: string;
+  githubContributionTokens?: Record<string, string>;
   secretCommand?: string[];
   githubCredentialsWriter?: string;
   relayUrl: string;
@@ -62,6 +64,7 @@ export interface BuzzTransport {
     content: string,
     options?: Pick<SendOptions, 'dedupKey'>,
   ): Promise<string>;
+  channelName?(channel: string): Promise<string>;
   canManage(channel: string, pubkey: string): Promise<boolean>;
   query(filters: Record<string, unknown>[]): Promise<Event[]>;
 }
@@ -85,7 +88,8 @@ export interface AppContext {
   buzz: BuzzTransport;
   account?(pubkey: string): Promise<Account | undefined>;
   link?(
-    purpose: 'signin' | 'settings' | 'open' | 'reminders' | 'issue-edit',
+    purpose:
+      'signin' | 'settings' | 'open' | 'reminders' | 'issue-edit' | 'summaries',
     message: Message,
     data?: Record<string, unknown>,
   ): Promise<string>;

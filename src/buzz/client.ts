@@ -243,6 +243,22 @@ export class BuzzClient implements BuzzTransport {
     return info.self;
   }
 
+  async channelName(channel: string): Promise<string> {
+    const relay = await this.ensureRelayIdentity();
+    const events = await this.query([
+      { kinds: [39000], authors: [relay], '#d': [channel], limit: 1 },
+    ]);
+    const event = events.find(
+      (e) => e.pubkey === relay && tag(e, 'd') === channel,
+    );
+    if (!event) return channel;
+    try {
+      return JSON.parse(event.content).name || tag(event, 'name') || channel;
+    } catch {
+      return tag(event, 'name') || channel;
+    }
+  }
+
   async canManage(channel: string, pubkey: string): Promise<boolean> {
     if (this.config.admins.includes(pubkey)) return true;
     const relay = await this.ensureRelayIdentity();

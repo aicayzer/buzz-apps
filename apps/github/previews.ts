@@ -62,7 +62,7 @@ export async function previewLinks(
             )
           ).data;
           if (!belongsToRepository(target!, issue)) continue;
-          body = `**${label(target)}**\n[#${issue.number}: ${label(issue.title)}](${link(issue.html_url)})\n**${label(issue.state)}**\n\n${plain(issue.body, 500)}`;
+          body = `[${label(target)}](${link('https://github.com/' + target)})\n[#${issue.number}: ${label(issue.title)}](${link(issue.html_url)})\n**${label(issue.state)}**\n\n${plain(issue.body, 500)}`;
           const comment = /^#issuecomment-(\d+)$/.exec(url.hash);
           if (comment) {
             const result = await client.request(

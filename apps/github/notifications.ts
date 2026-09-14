@@ -40,6 +40,7 @@ export function formatNotification(
 ): Notification | undefined {
   const repo = payload.repository?.full_name;
   if (!repo) return;
+  const repository = `[${label(repo)}](${link('https://github.com/' + repo)})`;
   const actor = label(payload.sender?.login ?? 'GitHub');
   const action = String(payload.action ?? 'updated');
   const issue = payload.issue ?? payload.pull_request;
@@ -61,18 +62,46 @@ export function formatNotification(
   ) {
     const kind =
       issue.pull_request || payload.pull_request ? 'Pull request' : 'Issue';
-    const state = issue.merged ? 'merged' : issue.draft ? 'draft' : issue.state;
+    const state = issue.merged
+      ? 'merged'
+      : issue.draft && issue.state !== 'closed'
+        ? 'draft'
+        : issue.state;
+    const icon =
+      state === 'merged' || state === 'closed'
+        ? '✅'
+        : state === 'draft'
+          ? '📝'
+          : kind === 'Issue'
+            ? '🟢'
+            : '🔀';
     const title = `${kind} #${issue.number}: ${label(issue.title)}`;
-    const summary = `**${label(repo)}**\n[${title}](${link(issue.html_url)})\n**${label(state)}**${issue.user?.login ? `, opened by ${label(issue.user.login)}` : ''}${issue.labels?.length ? `\nLabels: ${issue.labels.map((item: any) => label(item.name)).join(', ')}` : ''}`;
-    const reply = payload.comment
-      ? `${actor} commented:\n\n${plain(payload.comment.body)}\n\n[View comment](${link(payload.comment.html_url)})`
-      : payload.review
-        ? `${actor} reviewed: **${label(payload.review.state)}**\n\n${plain(payload.review.body)}\n\n[View review](${link(payload.review.html_url)})`
-        : ['opened', 'edited', 'labeled', 'unlabeled', 'synchronize'].includes(
-              action,
-            )
-          ? undefined
-          : `${actor} ${label(issue.merged && action === 'closed' ? 'merged' : action.replaceAll('_', ' '))} [#${issue.number}](${link(issue.html_url)}).`;
+    const heading =
+      state === 'draft'
+        ? 'Draft pull request'
+        : `${kind} ${state === 'open' ? 'opened' : label(state)}`;
+    const summary = `${icon} **${heading}**\n${repository} [#${issue.number}](${link(issue.html_url)})\n**${label(issue.title)}**${issue.user?.login ? `\n\n- **Author:** ${label(issue.user.login)}` : ''}${issue.base?.ref ? `\n- **Branch:** ${label(issue.head?.ref)} → ${label(issue.base.ref)}` : ''}${issue.labels?.length ? `\n- Labels: ${issue.labels.map((item: any) => label(item.name)).join(', ')}` : ''}`;
+    let reply: string | undefined;
+    if (payload.comment)
+      reply = `💬 **${actor} commented**\n\n${plain(payload.comment.body)}\n\n[View comment](${link(payload.comment.html_url)})`;
+    else if (payload.review) {
+      const states: Record<string, string> = {
+        approved: '✅ **Approved',
+        changes_requested: '✏️ **Changes requested',
+        commented: '💬 **Review',
+        dismissed: '⚪ **Review dismissed',
+      };
+      reply = `${states[String(payload.review.state).toLowerCase()] ?? '💬 **Review'} by ${actor}**${payload.review.body ? '\n\n' + plain(payload.review.body) : ''}\n\n[View review](${link(payload.review.html_url)})`;
+    } else if (
+      !['opened', 'edited', 'labeled', 'unlabeled', 'synchronize'].includes(
+        action,
+      )
+    ) {
+      if (action === 'review_requested')
+        reply = `👀 **Review requested**\n${actor} requested a review${payload.requested_reviewer?.login ? ' from **' + label(payload.requested_reviewer.login) + '**' : payload.requested_team?.name ? ' from **' + label(payload.requested_team.name) + '**' : ''}.`;
+      else
+        reply = `${icon} **${action === 'ready_for_review' ? 'Ready for review' : kind + ' ' + label(issue.merged && action === 'closed' ? 'merged' : action.replaceAll('_', ' '))}**\nBy **${actor}**. [View #${issue.number}](${link(issue.html_url)})`;
+    }
     return {
       key: `${repo}:issue:${issue.number}`,
       title,
@@ -84,12 +113,12 @@ export function formatNotification(
     };
   }
   if (event === 'push') {
-    const commits = (payload.commits ?? []).slice(0, 8);
-    const count = payload.commits?.length ?? 0;
+    const commits = (payload.commits ?? []).slice(0, 8),
+      count = payload.commits?.length ?? 0;
     return {
       key: `${repo}:push:${payload.after}`,
-      title: `${count} commit${count === 1 ? '' : 's'}`,
-      body: `**${label(repo)}**, ${label(String(payload.ref).replace('refs/heads/', ''))}\n${actor} pushed ${count} commit${count === 1 ? '' : 's'}:\n${commits.map((commit: any) => `- [${String(commit.id).slice(0, 7)}](${link(commit.url)}) ${label(String(commit.message).split('\n')[0])}`).join('\n')}${count > 8 ? `\n[View all commits](${link(payload.compare)})` : ''}`,
+      title: `${count} commits`,
+      body: `📦 **${count} commit${count === 1 ? '' : 's'} pushed**\n${repository}, ${label(String(payload.ref).replace('refs/heads/', ''))}\n\n${commits.map((c: any) => `- [${String(c.id).slice(0, 7)}](${link(c.url)}) ${label(String(c.message).split('\n')[0])}`).join('\n')}${count > 8 ? '\n- ' + (count - 8) + ' more commits.' : ''}\n\nPushed by **${actor}**. [Compare changes](${link(payload.compare)})`,
       url: link(payload.compare),
       logins: [],
     };
@@ -97,33 +126,73 @@ export function formatNotification(
   if (event === 'workflow_run') {
     const run = payload.workflow_run;
     if (!run) return;
+    const state = run.conclusion ?? run.status;
+    const words: Record<string, string> = {
+      success: 'passed',
+      failure: 'failed',
+      in_progress: 'is running',
+      queued: 'is queued',
+      waiting: 'is waiting',
+      action_required: 'needs attention',
+      cancelled: 'cancelled',
+      timed_out: 'timed out',
+      skipped: 'skipped',
+      neutral: 'completed',
+    };
+    const icon =
+      state === 'success'
+        ? '✅'
+        : ['failure', 'timed_out'].includes(state)
+          ? '❌'
+          : ['cancelled', 'skipped', 'neutral'].includes(state)
+            ? '⚪'
+            : '⏳';
     return {
       key: `${repo}:workflow:${run.id}`,
       title: label(run.name),
-      body: `**${label(repo)}**\n[${label(run.name)} #${run.run_number}](${link(run.html_url)})\n**${label(run.conclusion ?? run.status)}**, ${label(run.head_branch)}\nTriggered by ${label(run.actor?.login ?? payload.sender?.login)}`,
+      body: `${icon} **${label(run.name)} ${words[state] ?? label(state)}**\n${repository}\n\n- **Branch:** ${label(run.head_branch)}\n- **Run:** [#${run.run_number}](${link(run.html_url)})\n- **Triggered by:** ${label(run.actor?.login ?? payload.sender?.login)}`,
       url: link(run.html_url),
       important: run.status === 'completed',
       logins: [],
     };
   }
   if (event === 'release') {
-    const release = payload.release;
-    if (!release) return;
+    const r = payload.release;
+    if (!r) return;
+    const notes = plain(r.body)
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(
+        (l) =>
+          l &&
+          !/^#{1,6}\s|^full changelog:|^\*\*full changelog|^\*?\s*@\S+ made their first contribution/i.test(
+            l,
+          ),
+      )
+      .slice(0, 3)
+      .map((l) => '- ' + l.replace(/^[-*]\s+/, ''));
     return {
-      key: `${repo}:release:${release.id}`,
-      title: label(release.name ?? release.tag_name),
-      body: `**${label(repo)}**\n[Release ${label(release.name ?? release.tag_name)}](${link(release.html_url)})${release.prerelease ? ' (prerelease)' : ''}\n\n${plain(release.body)}`,
-      url: link(release.html_url),
+      key: `${repo}:release:${r.id}`,
+      title: label(r.name || r.tag_name),
+      body: `${r.prerelease ? '🧪' : '📦'} **${r.prerelease ? 'Pre-release' : 'Release'} ${label(r.name || r.tag_name)}**\n${repository}${notes.length ? '\n\n' + notes.join('\n') : ''}\n\n[Read release notes](${link(r.html_url)})`,
+      url: link(r.html_url),
       logins: [],
     };
   }
   if (event === 'deployment' || event === 'deployment_status') {
-    const deployment = payload.deployment;
-    if (!deployment) return;
+    const d = payload.deployment;
+    if (!d) return;
+    const state = payload.deployment_status?.state ?? 'pending';
+    const heading =
+      state === 'success'
+        ? 'Deployed to'
+        : state === 'failure' || state === 'error'
+          ? 'Deployment failed in'
+          : 'Deploying to';
     return {
-      key: `${repo}:deployment:${deployment.id}`,
-      title: `Deployment to ${label(deployment.environment)}`,
-      body: `**${label(repo)}**\nDeployment to **${label(deployment.environment)}**: **${label(payload.deployment_status?.state ?? 'created')}**\nRef: ${label(deployment.ref)}${payload.deployment_status?.description ? `\n${plain(payload.deployment_status.description)}` : ''}`,
+      key: `${repo}:deployment:${d.id}`,
+      title: `Deployment to ${label(d.environment)}`,
+      body: `${state === 'success' ? '✅' : state === 'failure' || state === 'error' ? '❌' : '⏳'} **${heading} ${label(d.environment)}**\n${repository}\n\n- **Ref:** ${label(d.ref)}\n- **Status:** ${label(state)}${payload.deployment_status?.description ? '\n- ' + plain(payload.deployment_status.description) : ''}\n\n[View deployment](${link('https://github.com/' + repo + '/deployments')})`,
       url: `https://github.com/${repo}/deployments`,
       logins: [],
     };
@@ -132,20 +201,20 @@ export function formatNotification(
     return {
       key: `${repo}:branch:${payload.ref}:${event}:${payload.sender?.id}`,
       title: 'Branch updated',
-      body: `**${label(repo)}**\n${actor} ${event === 'create' ? 'created' : 'deleted'} branch **${label(payload.ref)}**.`,
+      body: `🌿 **Branch ${event === 'create' ? 'created' : 'deleted'}**\n${repository}\n\n- **Branch:** ${label(payload.ref)}\n- **By:** ${actor}`,
       url: `https://github.com/${repo}/branches`,
       logins: [],
     };
   if (event === 'discussion' || event === 'discussion_comment') {
-    const discussion = payload.discussion;
-    if (!discussion) return;
+    const d = payload.discussion;
+    if (!d) return;
     return {
-      key: `${repo}:discussion:${discussion.number}`,
-      title: label(discussion.title),
-      body: `**${label(repo)}**\n[Discussion #${discussion.number}: ${label(discussion.title)}](${link(discussion.html_url)})\n${label(discussion.state ?? action)}`,
-      url: link(discussion.html_url),
+      key: `${repo}:discussion:${d.number}`,
+      title: label(d.title),
+      body: `💬 **Discussion ${label(d.state ?? action)}**\n${repository} [#${d.number}](${link(d.html_url)})\n**${label(d.title)}**`,
+      url: link(d.html_url),
       reply: payload.comment
-        ? `${actor} commented:\n\n${plain(payload.comment.body)}`
+        ? `💬 **${actor} replied**\n\n${plain(payload.comment.body)}`
         : undefined,
       logins: [],
     };
