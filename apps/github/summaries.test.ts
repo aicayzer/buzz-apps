@@ -260,3 +260,61 @@ test('retry backoff avoids hammering an unavailable provider', async () => {
   await deliverSummaries(ctx, api, now + 1000);
   expect(ctx.buzz.send).toHaveBeenCalledTimes(1);
 });
+
+test('readable arguments save through the same account and channel checks', async () => {
+  const app = createGithubApp(ctx);
+  vi.spyOn(app.api, 'account').mockResolvedValue({ login: 'person' } as any);
+  const command = {
+    ...message,
+    tags: [['p', 'bot']],
+    content:
+      'summaries set readable --cadence daily --scope personal --time 09:00 --destination here',
+  };
+  await app.onMessage(command);
+  expect(
+    store.get<Summary>('github:summaries', 'person:readable')?.channel,
+  ).toBe('room');
+  vi.mocked(ctx.buzz.canManage).mockResolvedValue(false);
+  await app.onMessage({
+    ...command,
+    content: command.content.replace('readable', 'denied'),
+  });
+  expect(store.get('github:summaries', 'person:denied')).toBeUndefined();
+});
+test('partial command opens a prefilled form without saving or assuming a destination', async () => {
+  const app = createGithubApp(ctx);
+  vi.spyOn(app.api, 'account').mockResolvedValue({ login: 'person' } as any);
+  ctx.link = vi.fn().mockResolvedValue('https://example.com/private');
+  await app.onMessage({
+    ...message,
+    tags: [['p', 'bot']],
+    content:
+      'summaries set weekly --cadence weekly --scope personal --time 10:30',
+  });
+  expect(ctx.link).toHaveBeenCalledWith('summaries', expect.anything(), {
+    draft: expect.objectContaining({
+      id: 'weekly',
+      time: '10:30',
+      cadence: 'weekly',
+    }),
+  });
+  expect(store.list('github:summaries')).toHaveLength(0);
+  expect(ctx.buzz.send).toHaveBeenCalledWith(
+    'room',
+    expect.stringContaining('destination'),
+    expect.anything(),
+  );
+});
+test('enable and disable cannot edit another destination channel', async () => {
+  store.set('github:summaries', 'person:daily', base);
+  const app = createGithubApp(ctx);
+  await app.onMessage({
+    ...message,
+    channel: 'different',
+    tags: [['p', 'bot']],
+    content: 'summaries disable daily',
+  });
+  expect(store.get<Summary>('github:summaries', 'person:daily')?.enabled).toBe(
+    true,
+  );
+});

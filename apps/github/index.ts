@@ -1,3 +1,4 @@
+import { summaryInput, SUMMARY_HELP } from './summary-command.js';
 import { effectiveTimezone, timezoneLabel } from '../../src/core/timezone.js';
 import {
   channelLink,
@@ -76,6 +77,7 @@ export class GithubApp implements BuzzApp {
       'signin' | 'settings' | 'open' | 'reminders' | 'issue-edit' | 'summaries',
     message: Message,
     data: Record<string, unknown> = {},
+    acknowledgement = 'I sent you a private link.',
   ): Promise<void> {
     if (!this.context.link)
       throw new GithubInputError(
@@ -86,7 +88,7 @@ export class GithubApp implements BuzzApp {
       message,
       `[${{ signin: 'Sign in to GitHub', settings: 'Change notification settings', open: 'Create an issue', reminders: 'Configure review reminders', 'issue-edit': 'Edit the issue', summaries: 'Configure activity summaries' }[purpose]}](${url})\n\nThis link expires. Open it yourself; do not forward it.`,
     );
-    await this.reply(message, 'I sent you a private link.');
+    await this.reply(message, acknowledgement);
   }
   async onMessage(message: Message): Promise<void> {
     if (message.author === this.context.buzz.pubkey) return;
@@ -669,6 +671,10 @@ export class GithubApp implements BuzzApp {
   }
   private async summaries(message: Message, tokens: string[]): Promise<void> {
     const [action, id, ...rest] = tokens;
+    if (action === 'help') {
+      await this.reply(message, SUMMARY_HELP);
+      return;
+    }
     if (!action) {
       await this.api.account(message.author);
       await this.form('summaries', message);
@@ -679,7 +685,25 @@ export class GithubApp implements BuzzApp {
       return;
     }
     if (action === 'set') {
-      const input = JSON.parse(rest.join(' ')) as Summary;
+      if (!id) throw new GithubInputError(SUMMARY_HELP);
+      const existing = this.context.store.get<Summary>(
+        'github:summaries',
+        `${message.author}:${id}`,
+      );
+      const parsed = rest[0]?.startsWith('{')
+        ? { input: JSON.parse(rest.join(' ')) as Summary, missing: [] }
+        : summaryInput(id, rest, message, existing);
+      if (parsed.missing.length) {
+        await this.api.account(message.author);
+        await this.form(
+          'summaries',
+          message,
+          { draft: parsed.input },
+          `Choose ${parsed.missing.join(', ')} using the configuration link. Your other options are already filled in.`,
+        );
+        return;
+      }
+      const input = parsed.input;
       await saveSummary(this.context, this.api, message, { ...input, id });
       await this.reply(
         message,
@@ -701,6 +725,17 @@ export class GithubApp implements BuzzApp {
       throw new GithubInputError(
         'Manage this summary from its destination channel.',
       );
+    if (action === 'enable' || action === 'disable') {
+      await saveSummary(this.context, this.api, message, {
+        ...summary,
+        enabled: action === 'enable',
+      });
+      await this.reply(
+        message,
+        `**Summary ${action === 'enable' ? 'enabled' : 'disabled'}**`,
+      );
+      return;
+    }
     if (action === 'delete') {
       this.context.store.delete('github:summaries', key);
       this.context.store.delete('github:summary-errors', key);

@@ -16,7 +16,7 @@ The GitHub app brings repository notifications and commands into Buzz: subscript
 @GitHub help
 ```
 
-Behaviour follows GitHub's Slack integration where Buzz supports it. Messages use Buzz Markdown, links and threads; forms open in a browser. See the [GitHub guide](docs/github.md) for commands and compatibility.
+Behaviour follows GitHub's Slack integration where Buzz supports it. Messages use Buzz Markdown, links and threads; forms open in a browser. Summary schedules accept readable arguments or a prefilled form; agents can use the local CLI without posting setup messages. See the [GitHub guide](docs/github.md) for commands and compatibility.
 
 ## Install
 
