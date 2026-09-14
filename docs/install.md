@@ -7,7 +7,7 @@ Run one Buzz Apps service on a machine that can reach your Buzz relay and receiv
 Use Node.js 24 LTS and npm. Native services support macOS launchd and Linux systemd. Linux needs a user service manager; enable lingering for your service account if it must survive logout. macOS LaunchAgents run in the user's login session and survive SSH disconnects, but require that login session after a reboot.
 
 ```sh
-npm install --global buzz-apps
+npm install --global buzz-apps@next
 buzz-apps setup
 buzz-apps enable github
 ```

@@ -22,7 +22,7 @@ Behaviour follows GitHub's Slack integration where Buzz supports it. Messages us
 Use Node.js 24 LTS, a Buzz relay and a public HTTPS address for callbacks and webhooks. Install the npm package, configure the shared service, then enable GitHub:
 
 ```sh
-npm install --global buzz-apps
+npm install --global buzz-apps@next
 buzz-apps setup
 buzz-apps enable github
 buzz-apps service install
