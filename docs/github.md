@@ -99,7 +99,27 @@ Daily reports cover the previous complete local day. Weekly reports cover the se
 
 Schedules survive restarts and missed runs catch up with the latest due period, rather than flooding the channel with every missed day. Failed deliveries retain their period and deduplication key, retry with backoff, and affect readiness until resolved. Disabling/deleting or editing a summary clears its previous failure state.
 
-Agents can configure without a browser using `summaries set NAME '{"cadence":"daily","scope":"personal","targets":[],"time":"09:00","weekday":1,"enabled":true,"skipEmpty":true}'`. Quote the JSON as one command argument. Omit `channel` for a private summary; set it to the channel UUID for authorised channel delivery. Do not include credentials in commands. `timezone` is optional.
+### Configure with readable arguments
+
+```text
+@GitHub summaries set daily --cadence daily --scope personal --time 09:00 --destination here
+@GitHub summaries set weekly --cadence weekly --scope repositories --repos owner/repo,owner/other --day monday --time 09:00 --destination private
+@GitHub summaries disable daily
+@GitHub summaries enable daily
+```
+
+Missing options open a private form with the supplied choices filled in. `--destination here` means the channel where you issued the command; `private` means you alone. Use `--scope organisation --org OWNER` for an organisation, `--skip-empty false` to include quiet periods, and `--timezone Europe/London` to override the shared timezone (`default` removes an override). New weekly schedules default to Monday and empty periods are skipped. Updating an existing name preserves unspecified options. `summaries help` lists the arguments. JSON remains accepted for compatibility, but is not needed.
+
+### Quiet agent configuration
+
+The local CLI sends the same command directly to the running service, without publishing setup messages to Buzz:
+
+```sh
+buzz-apps github --key-file /secure/buzz-person.key --channel CHANNEL_ID -- summaries set daily --cadence daily --scope personal --time 09:00 --destination here
+buzz-apps github --key-file /secure/buzz-person.key --channel CHANNEL_ID -- summaries list
+```
+
+The key file contains only the linked person's hex Buzz private key. Never put that key in a command argument or repository. The request is signed by that person; it does not impersonate an arbitrary public key. The service applies the same GitHub account and destination-channel permissions as Buzz and browser forms. It uses a local socket restricted to the service user, with expiring, replay-protected requests; it is not exposed through the public HTTP endpoint. The service must be running on the same machine. Output, including any private form link, returns to the terminal. Only summary commands and status are supported on this route; it does not publish arbitrary messages or GitHub writes.
 
 ### Personal contribution coverage
 

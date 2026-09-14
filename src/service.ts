@@ -1,3 +1,4 @@
+import { localControl } from './core/local-control.js';
 import Fastify, { LogController } from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import { createGithubForms } from '../apps/github/forms.js';
@@ -236,6 +237,12 @@ export async function startService(
       host: config.host,
       port: config.port,
     });
+    const closeControl = await localControl(ctx);
+    const previousCleanup = cleanup;
+    cleanup = async () => {
+      await closeControl();
+      await previousCleanup();
+    };
     const timer = setInterval(() => void work(), 2000);
     timer.unref();
     // Setup and health remain usable even when the relay is temporarily unavailable.

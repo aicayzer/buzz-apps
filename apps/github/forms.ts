@@ -117,7 +117,7 @@ export function createGithubForms(
               'github:summaries',
               `${message.author}:${data.id}`,
             )
-          : undefined;
+          : (data.draft as Summary | undefined);
         if (data.id && !saved)
           throw new GithubInputError('This summary no longer exists.');
         if (
@@ -129,14 +129,14 @@ export function createGithubForms(
             'Open this summary from its destination channel.',
           );
         return {
-          title: saved ? 'Edit activity summary' : 'Create activity summary',
+          title: data.id ? 'Edit activity summary' : 'Create activity summary',
           fields: [
             {
               name: 'id',
               label: 'Name',
               value: saved?.id ?? '',
               required: true,
-              readonly: !!saved,
+              readonly: !!data.id,
             },
             {
               name: 'cadence',

@@ -286,3 +286,40 @@ test('an unavailable source thread never silently copies a command as the issue 
     }),
   ).rejects.toThrow('source thread is unavailable');
 });
+
+test('partial summary arguments prefill the existing form and submit through authorisation', async () => {
+  const app = createGithubApp(ctx);
+  vi.spyOn(app.api, 'account').mockResolvedValue({ login: 'person' } as any);
+  const forms = createGithubForms(ctx, app);
+  const draft = record('summaries', {
+    draft: {
+      id: 'weekly',
+      cadence: 'weekly',
+      scope: 'personal',
+      targets: [],
+      time: '10:30',
+      weekday: 1,
+      enabled: true,
+      skipEmpty: false,
+    },
+  });
+  const fields = await forms.fields(draft);
+  expect(values(fields)).toMatchObject({
+    id: 'weekly',
+    cadence: 'weekly',
+    time: '10:30',
+    destination: 'personal',
+    skipEmpty: 'false',
+  });
+  expect(fields.fields.find((f) => f.name === 'id')?.readonly).toBe(false);
+  const posted = { ...values(fields), destination: 'channel' };
+  vi.mocked(ctx.buzz.canManage).mockResolvedValue(false);
+  await expect(forms.submit(draft, posted)).rejects.toThrow();
+  expect(store.list('github:summaries')).toHaveLength(0);
+  vi.mocked(ctx.buzz.canManage).mockResolvedValue(true);
+  await forms.submit(draft, posted);
+  expect(store.get('github:summaries', 'person:weekly')).toMatchObject({
+    channel: 'channel',
+    time: '10:30',
+  });
+});

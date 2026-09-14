@@ -32,6 +32,8 @@ Updates are explicit. The CLI manages the existing npm installation and backs up
 
 ## Operating surface
 
-The public HTTPS endpoint receives GitHub webhooks, app registration callbacks and account-linking forms. Native operation binds loopback by default; the operator supplies HTTPS routing. Docker runs the same process with persistent configuration and data volumes. Health responses contain aggregate readiness only. Logs omit tokens, webhook payloads and private message content.
+The public HTTPS endpoint receives GitHub webhooks, app registration callbacks and account-linking forms. A separate Unix socket in the service data directory accepts signed, expiring local configuration commands and returns responses to the CLI. It is restricted to the service user, enforces replay protection and retains the signed person’s app permissions. It does not share the public HTTP listener or post configuration chatter to Buzz.
+
+Native operation binds loopback by default; the operator supplies HTTPS routing. Docker runs the same process with persistent configuration and data volumes. Health responses contain aggregate readiness only. Logs omit tokens, webhook payloads and private message content.
 
 Protocol compatibility was checked against Buzz upstream on 13 September 2026. Use the tests and release notes to assess later upstream changes; the repository does not bundle or modify Buzz.

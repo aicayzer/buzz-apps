@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { sendControl } from '../core/local-control.js';
 import { Command } from 'commander';
 import { validTimezone } from '../core/timezone.js';
 import {
@@ -14,7 +15,7 @@ import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { randomBytes } from 'node:crypto';
 import { createInterface } from 'node:readline/promises';
-import { generateSecretKey, getPublicKey } from 'nostr-tools';
+import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
 import {
   loadConfig,
   defaultConfigPath,
@@ -69,6 +70,47 @@ function writeConfig(path: string, value: unknown): void {
 function config(): Config {
   return loadConfig(resolve(options().config));
 }
+program
+  .command('github')
+  .description(
+    'Configure GitHub quietly through the running local service. Put command arguments after --.',
+  )
+  .requiredOption(
+    '--key-file <path>',
+    'File containing the linked person’s 64-character hex Buzz private key',
+  )
+  .requiredOption(
+    '--channel <id>',
+    'Destination Buzz channel ID, checked against the signed person’s permissions',
+  )
+  .argument(
+    '<arguments...>',
+    'For example: summaries set daily --cadence daily --scope personal --time 09:00 --destination here',
+  )
+  .action(async (args: string[], opts) => {
+    const current = config();
+    const key = readFileSync(resolve(opts.keyFile), 'utf8').trim();
+    if (!/^[a-f\d]{64}$/i.test(key))
+      throw new Error(
+        'The key file must contain only a 64-character hex Buzz private key.',
+      );
+    const event = finalizeEvent(
+      {
+        kind: 27235,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['audience', current.relayUrl],
+          ['channel', opts.channel],
+          ['nonce', randomBytes(16).toString('hex')],
+        ],
+        content: args.map((arg) => JSON.stringify(arg)).join(' '),
+      },
+      Buffer.from(key, 'hex'),
+    );
+    const messages = await sendControl(current.dataDir, event);
+    if (options().json) output({ messages });
+    else console.log(messages.join('\n\n'));
+  });
 program
   .command('setup')
   .description('Configure the shared service; apps are enabled separately.')
