@@ -124,3 +124,5 @@ The key file contains only the linked person's hex Buzz private key. Never put t
 ### Personal contribution coverage
 
 A GitHub App user token can return calendar totals beyond the repositories available to the app, while its detailed breakdown is narrower. The summary labels that limitation. For a full personal breakdown, an operator can supply `githubContributionTokens`, a map from Buzz public key to a GitHub personal token, through external configuration or the secret provider. The service verifies that the token belongs to the same linked GitHub account on every summary request. This optional credential is used only for personal contribution reads, never normal commands, repository access approvals or writes. Keep tokens out of Buzz messages and version control.
+
+The quiet local interface requires management permission for the supplied Buzz channel, including read-only status commands. The key identifies the linked person; filesystem access alone does not authorise channel access.
