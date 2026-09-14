@@ -12,7 +12,7 @@ buzz-apps setup
 buzz-apps enable github
 ```
 
-Until the initial npm publication, download the `.tgz` and `SHA256SUMS` from the release, verify its checksum, then run `npm install --global ./buzz-apps-VERSION.tgz`. Release candidates use the `next` npm tag after publication. This is the same npm installation, not a separate installer.
+Alternatively, download the `.tgz` and `SHA256SUMS` from the release, verify its checksum, then run `npm install --global ./buzz-apps-VERSION.tgz`. Release candidates use the `next` npm tag after publication. This is the same npm installation, not a separate installer.
 
 `setup` records your relay URL, public service URL and Buzz operator public key. Its default configuration is `~/.config/buzz-apps/config.json`; persistent data defaults to `~/.local/share/buzz-apps/data`. Override the file with `--config /absolute/path/config.json`. The service writes configuration as mode `0600`; keep the containing directory private. Do not commit either configuration or data.
 
@@ -80,3 +80,7 @@ docker compose up -d
 ```
 
 The named volume holds the database. Before changing the pinned image version, stop the container and back up both that volume and configuration. Pull and start the new version, then check `docker compose exec buzz-apps node dist/src/cli/main.js doctor`. Roll back the image and matching data/configuration backup together. The native `update` and `rollback` commands deliberately reject Docker installations.
+
+## Shared timezone
+
+Choose the service timezone once with `buzz-apps setup --timezone Europe/London`, or update it with `buzz-apps timezone Europe/London` and restart the service. Omitted values default explicitly to UTC, never the server’s local timezone. `buzz-apps timezone` shows the saved setting. Use IANA names such as `America/Los_Angeles`; schedules follow daylight saving. A blank timezone override inherits the shared setting, while an explicit override stays fixed when the shared setting changes.

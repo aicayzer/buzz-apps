@@ -8,7 +8,7 @@ import { execFile } from 'node:child_process';
 import { isAbsolute } from 'node:path';
 
 export type LinkPurpose =
-  'signin' | 'settings' | 'open' | 'reminders' | 'issue-edit';
+  'signin' | 'settings' | 'open' | 'reminders' | 'issue-edit' | 'summaries';
 export interface LinkRecord {
   purpose: LinkPurpose;
   message: Message;
@@ -384,7 +384,7 @@ export class WebFlows {
         .send(
           page(
             preview ? 'Preview' : 'Saved',
-            `<p style="white-space:pre-wrap">${escapeHtml(result)}</p>${preview ? '<p><a href="/github/form">Back to reminder settings</a></p>' : '<p>Return to Buzz to continue.</p>'}`,
+            `<p style="white-space:pre-wrap">${escapeHtml(result)}</p>${preview ? '<p><a href="/github/form">Back to settings</a></p>' : '<p>Return to Buzz to continue.</p>'}`,
           ),
         );
     });

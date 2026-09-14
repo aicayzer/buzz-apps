@@ -158,7 +158,7 @@ describe('command and access boundaries', () => {
     ]);
     expect(context.buzz.send).toHaveBeenCalledWith(
       'channel',
-      expect.stringContaining('private repository information'),
+      expect.stringContaining('Private repository notifications'),
       expect.anything(),
     );
   });
@@ -315,7 +315,7 @@ describe('notification filters and state', () => {
     );
     expect(context.buzz.send).toHaveBeenCalledWith(
       'channel',
-      expect.stringContaining('**closed**'),
+      expect.stringContaining('**Issue closed**'),
       expect.objectContaining({ edit: 'event-1' }),
     );
     expect(context.buzz.send).toHaveBeenCalledWith(

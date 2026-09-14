@@ -6,12 +6,13 @@
 
 Community apps for [Buzz](https://github.com/block/buzz), starting with GitHub. Run one service alongside your Buzz relay and enable the apps you need. Each app has its own bot identity and provider credentials.
 
-The GitHub app brings repository notifications and commands into Buzz: subscriptions, issue and pull request updates, Actions, deployments, previews and review reminders. Use a real mention of the bot followed by a command:
+The GitHub app brings repository notifications and commands into Buzz: subscriptions, issue and pull request updates, Actions, deployments, previews, review reminders and separate daily/weekly activity summaries. Use a real mention of the bot followed by a command:
 
 ```text
 @GitHub signin
 @GitHub subscribe owner/repository
-@GitHub subscribe list
+@GitHub status
+@GitHub summaries
 @GitHub help
 ```
 

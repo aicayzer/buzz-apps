@@ -82,3 +82,25 @@ The reference is the [GitHub Slack integration documentation](https://github.com
 See [architecture](architecture.md) for delivery guarantees and [installation](install.md) for installation and updates.
 
 Label changes, title/body edits and pull request synchronisation update the existing notification without adding a thread reply. Significant state changes, comments and reviews retain their thread behaviour.
+
+## Setup overview and activity summaries
+
+`@GitHub status` sends a private overview of the connected account, this channel’s subscriptions, other channels the caller can manage, and their own or manageable channel summaries. Channel names link to Buzz and repository names link to GitHub. No other person’s private summaries are listed.
+
+`@GitHub summaries` opens a private form. Create daily and weekly schedules independently; each is a separate message. Use `summaries NAME` to edit, `summaries list` to inspect, `summaries preview NAME` for a private preview, and `summaries delete NAME` to remove. Channel summaries must be configured from their destination channel by an owner or administrator. Choosing a channel explicitly permits sharing the configured activity, including private activity, with its members.
+
+Scopes:
+
+- **Personal:** GitHub contribution statistics, including totals, commits, issues, pull requests, reviews and top repositories by commit contributions. Weekly messages compare contribution totals with the previous week. These follow GitHub’s contribution rules and the linked account’s visibility, not every event or commit on every branch.
+- **Repositories:** activity for one repository or a group: PRs opened/merged, issues opened/closed, default-branch commits and submitted reviews. Outstanding reviews and failed workflow runs provide context.
+- **Organisation:** a snapshot of the repositories approved at setup. Newly accessible repositories are not silently added; edit and save to refresh approval. Removed access blocks delivery until reviewed.
+
+Daily reports cover the previous complete local day. Weekly reports cover the seven complete local days before delivery. Timezones inherit the shared service setting unless overridden. Empty reports can be skipped or delivered; incomplete repository results are labelled partial, never silently counted as zero. Repository work is bounded to 100 repositories and 1,000 commits/updated PRs per repository per period; exceeding a bound marks that repository unavailable.
+
+Schedules survive restarts and missed runs catch up with the latest due period, rather than flooding the channel with every missed day. Failed deliveries retain their period and deduplication key, retry with backoff, and affect readiness until resolved. Disabling/deleting or editing a summary clears its previous failure state.
+
+Agents can configure without a browser using `summaries set NAME '{"cadence":"daily","scope":"personal","targets":[],"time":"09:00","weekday":1,"enabled":true,"skipEmpty":true}'`. Quote the JSON as one command argument. Omit `channel` for a private summary; set it to the channel UUID for authorised channel delivery. Do not include credentials in commands. `timezone` is optional.
+
+### Personal contribution coverage
+
+A GitHub App user token can return calendar totals beyond the repositories available to the app, while its detailed breakdown is narrower. The summary labels that limitation. For a full personal breakdown, an operator can supply `githubContributionTokens`, a map from Buzz public key to a GitHub personal token, through external configuration or the secret provider. The service verifies that the token belongs to the same linked GitHub account on every summary request. This optional credential is used only for personal contribution reads, never normal commands, repository access approvals or writes. Keep tokens out of Buzz messages and version control.

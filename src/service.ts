@@ -101,7 +101,9 @@ export async function startService(
       githubConfigured: !!config.github,
     }));
     server.get('/ready', async (_request, reply) => {
-      const failed = store.counts().failed ?? 0;
+      const failed =
+        (store.counts().failed ?? 0) +
+        store.list('github:summary-errors').length;
       const transport = client?.status();
       const transportFailures = transport?.failed ?? 0;
       const ok =

@@ -21,6 +21,22 @@ export class GithubApi {
       throttle: { enabled: false },
     });
   }
+  async contributions(pubkey: string): Promise<Octokit> {
+    const account = await this.account(pubkey);
+    const token = this.context.config.githubContributionTokens?.[pubkey];
+    if (!token) return this.user(pubkey);
+    const client = new Octokit({
+      auth: token,
+      retry: { enabled: false },
+      throttle: { enabled: false },
+    });
+    const identity = (await client.request('GET /user')).data;
+    if (identity.login.toLowerCase() !== account.login.toLowerCase())
+      throw new GithubInputError(
+        'The contribution credential belongs to a different GitHub account.',
+      );
+    return client;
+  }
   async reader(pubkey: string): Promise<Octokit> {
     const account = this.context.account
       ? await this.context.account(pubkey)

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { validTimezone } from '../core/timezone.js';
 import {
   chmodSync,
   existsSync,
@@ -77,6 +78,7 @@ program
   )
   .option('--relay <url>', 'Buzz relay WebSocket URL')
   .option('--public-url <url>', 'Public HTTPS service URL')
+  .option('--timezone <zone>', 'Shared schedule timezone (IANA name)')
   .option('--admin <pubkey>', 'Buzz operator public key')
   .action(async (args) => {
     const path = resolve(options().config);
@@ -133,6 +135,7 @@ program
       );
     const created: Config = {
       ...input,
+      timezone: validTimezone(args.timezone || input.timezone || 'UTC'),
       relayUrl,
       publicUrl: publicUrl.replace(/\/$/, ''),
       identities: {},
@@ -159,6 +162,20 @@ program
       enabledApps: [],
       next: 'Run buzz-apps enable github to configure the GitHub identity and integration.',
     });
+  });
+program
+  .command('timezone [zone]')
+  .description('Show or change the shared schedule timezone.')
+  .action((zone?: string) => {
+    if (!zone) {
+      output({ timezone: config().timezone ?? 'UTC' });
+      return;
+    }
+    const path = resolve(options().config);
+    const raw = parseConfigurationJson(readFileSync(path, 'utf8'));
+    raw.timezone = validTimezone(zone);
+    writeConfig(path, raw);
+    output({ timezone: zone, restartRequired: true });
   });
 program
   .command('enable <app>')

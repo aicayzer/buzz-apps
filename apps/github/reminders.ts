@@ -1,3 +1,4 @@
+import { effectiveTimezone } from '../../src/core/timezone.js';
 import { belongsToRepository } from './canonical.js';
 import { GithubInputError } from './errors.js';
 import { createHash } from 'node:crypto';
@@ -12,7 +13,7 @@ export interface Reminder {
   author: string;
   channel?: string;
   repos: string[];
-  timezone: string;
+  timezone?: string;
   days: number[];
   time: string;
   team?: string;
@@ -51,7 +52,7 @@ export async function validateReminder(
       'Provide a time as HH:MM and weekdays from 0 (Sunday) to 6 (Saturday).',
     );
   try {
-    new Intl.DateTimeFormat('en', { timeZone: input.timezone }).format();
+    effectiveTimezone(context.config, input.timezone);
   } catch {
     throw new GithubInputError('Use a valid timezone such as Europe/London.');
   }
@@ -79,7 +80,13 @@ export async function validateReminder(
     await api.authorised(message.author, target);
   }
   const reminder = { ...input, author: message.author, lastAt: Date.now() };
-  schedule(reminder, new Date()).next();
+  schedule(
+    {
+      ...reminder,
+      timezone: effectiveTimezone(context.config, reminder.timezone),
+    },
+    new Date(),
+  ).next();
   return reminder;
 }
 export async function saveReminder(
@@ -194,7 +201,10 @@ export async function deliverReminders(
     try {
       const previous = reminder.lastAt ?? now;
       const expression = schedule(
-        reminder,
+        {
+          ...reminder,
+          timezone: effectiveTimezone(context.config, reminder.timezone),
+        },
         new Date(Math.max(previous, now - 86400000)),
       );
       const due = expression.next().getTime();
