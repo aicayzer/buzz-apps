@@ -58,7 +58,7 @@ A lost response to a write is treated as uncertain. The service journals the ope
 
 ## Previews and reminders
 
-Pasted GitHub links can show repositories, user and organisation profiles, issues, pull requests, comments, reviews and selected code lines. Public previews can work without a linked account. Private previews use the posting person's access. A private preview appears in a channel only when the repository is covered by an enabled subscription; otherwise it goes privately to the sender. There are at most three previews per message and forty code lines per preview.
+Pasted GitHub links can show repositories, user and organisation profiles, issues, pull requests, comments, reviews and selected code lines. Public previews can work without a linked account. Private previews use the posting person's access. A private preview appears in a channel only when the repository is covered by an enabled subscription; otherwise it goes privately to the sender. There are at most three previews per message and forty code lines per preview. Buzz’s explicit `link-preview: none` preference is honoured. Quoted examples, fenced or indented code, and inline code do not trigger automatic previews.
 
 ```text
 @GitHub reminders
@@ -74,7 +74,7 @@ Review reminders support personal or channel destinations, repositories, timezon
 The reference is the [GitHub Slack integration documentation](https://github.com/integrations/slack), reviewed in September 2026. Behaviour is implemented directly against GitHub's APIs; this is not a repackaged Slack app.
 
 - **Buzz controls differ.** Use a real bot mention. Slack slash commands, interactive buttons, coloured attachments, columns and ephemeral replies are replaced with messages, threads and private browser links.
-- **Identity links are explicit.** GitHub accounts are linked through sign-in. Linked reviewers, assignees and requested team members can be mentioned in Buzz; people without a link cannot receive a Buzz mention.
+- **Identity links are explicit.** GitHub accounts are linked through sign-in. Explicit assignments, review requests and direct mentions in authored comments or newly opened issues can notify linked people. Buzz mentions use their Buzz profile display name and native mention presentation. Release credits and quoted/code examples do not cause pings, and ordinary actor attribution links to the GitHub profile. People without a linked account cannot receive a Buzz mention.
 - **Scope is GitHub.com.** GitHub Enterprise Server and Slack administration-specific controls are not implemented.
 - **Bounded output stays readable.** Long descriptions, commit lists, code selections and reminder results are summarised with links to GitHub. Reminder search observes GitHub's search limits.
 - **Private messages depend on Buzz access controls.** They are not end-to-end encrypted. Never paste credentials into a channel or DM.
