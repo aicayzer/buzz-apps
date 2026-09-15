@@ -48,6 +48,42 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 describe('private browser flows', () => {
+  it('settings entry verifies identity without claiming it is disconnected and renders an empty state', async () => {
+    const f = await fixture();
+    const token = 'settings-entry';
+    const key = createHash('sha256').update(token).digest('hex');
+    const record = {
+      purpose: 'settings',
+      message: f.message,
+      data: {},
+      expires: Date.now() + 60000,
+    };
+    f.store.set('web:links', key, record);
+    const landing = await f.server.inject({ url: '/github/link/' + token });
+    expect(landing.statusCode).toBe(200);
+    expect(landing.body).toContain('Confirm your GitHub identity');
+    expect(landing.body).not.toContain('Connect your GitHub account');
+    expect(f.store.get('web:links', key)).toBeDefined();
+    f.store.set('web:sessions', key, record);
+    f.web.forms = {
+      fields: async () => ({
+        title: 'No subscriptions yet',
+        description: 'Use @GitHub subscribe OWNER/REPO <then> open settings.',
+        fields: [],
+      }),
+      submit: async () => '',
+    };
+    const empty = await f.server.inject({
+      url: '/github/form',
+      headers: { cookie: 'buzz_session=' + token },
+    });
+    expect(empty.statusCode).toBe(200);
+    expect(empty.body).toContain('No subscriptions yet');
+    expect(empty.body).toContain('&lt;then&gt;');
+    expect(empty.body).not.toContain('<button>Save</button>');
+    expect(empty.body).not.toContain('Unable to continue');
+  });
+
   it('keeps a preview session, allows safe input corrections, and consumes uncertain writes', async () => {
     const f = await fixture(),
       token = 'preview-session';

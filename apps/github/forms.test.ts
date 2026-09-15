@@ -325,3 +325,12 @@ test('partial summary arguments prefill the existing form and submit through aut
     time: '10:30',
   });
 });
+
+test('settings without subscriptions show an actionable empty state', async () => {
+  const form = await createGithubForms(ctx, createGithubApp(ctx)).fields(
+    record('settings'),
+  );
+  expect(form.title).toBe('No subscriptions yet');
+  expect(form.description).toContain('@GitHub subscribe OWNER/REPO');
+  expect(form.fields).toEqual([]);
+});

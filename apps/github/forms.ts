@@ -228,9 +228,12 @@ export function createGithubForms(
         await github.manage(message);
         const subscriptions = github.subscriptions(message.channel);
         if (!subscriptions.length)
-          throw new GithubInputError(
-            'Subscribe this channel to a repository before opening its settings.',
-          );
+          return {
+            title: 'No subscriptions yet',
+            description:
+              'In this Buzz channel, use @GitHub subscribe OWNER/REPO to add a repository. Then open settings to choose how its updates appear.',
+            fields: [],
+          };
         if (!data.target && subscriptions.length > 1) {
           if (!ctx.link)
             throw new GithubInputError('Browser links are unavailable.');
