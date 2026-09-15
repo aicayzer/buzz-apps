@@ -28,7 +28,29 @@ import { deliverWebhook } from './notifications.js';
 import { deliverReminders, saveReminder, type Reminder } from './reminders.js';
 import { previewLinks } from './previews.js';
 
-export const HELP = `**GitHub**\n\n- \`@GitHub status\`\n- \`@GitHub summaries\`\n\n- \`@GitHub subscribe OWNER/REPO [features]\`\n- \`@GitHub unsubscribe OWNER/REPO [features]\`\n- \`@GitHub subscribe list [features]\`\n- \`@GitHub settings\`\n- \`@GitHub open\`\n- \`@GitHub issue OWNER/REPO#NUMBER comment TEXT|edit|close|reopen\`\n- \`@GitHub workflow OWNER/REPO RUN_ID rerun [failed] [debug]\`\n- \`@GitHub deployment OWNER/REPO RUN_ID approve|reject ENVIRONMENT\`\n- \`@GitHub reminders\`\n- \`@GitHub signout\`\n\n- **Default notifications:** issues, pull requests, default-branch commits, releases and deployments.\n- **Optional notifications:** workflows, reviews, comments, branches and discussions.\n- **Filters:** \`commits:BRANCH\`, \`+label:LABEL\`, \`name=WORKFLOW\`, \`event=EVENT\`, \`branch=BRANCH\` and \`actor=LOGIN\`.\n- **Organisations:** use \`OWNER\` to subscribe to an organisation.\n- **Private repositories:** subscriptions publish to the whole channel.\n\n**Account**\n- Use \`@GitHub signin\` to connect or reconnect your account.`;
+export const HELP = `**Repository notifications**
+- \`@GitHub subscribe OWNER/REPO\` — follow a repository here.
+- \`@GitHub unsubscribe OWNER/REPO\` — stop following it.
+- \`@GitHub settings\` — choose notification options.
+
+**Default updates:** issues, PRs, default-branch commits, releases and deployments.
+Updates posted here are visible to everyone in this channel.
+
+**Summaries and reminders**
+- \`@GitHub summaries\` — configure daily and weekly summaries.
+- \`@GitHub reminders\` — configure review reminders.
+
+**Issues and actions**
+- \`@GitHub open\` — create an issue using a form.
+- \`@GitHub issue OWNER/REPO#NUMBER close\` — close an issue.
+
+[Full command reference](https://github.com/aicayzer/buzz-apps/blob/main/docs/github.md) covers comments, editing, workflow reruns and deployment approvals.
+
+**Your setup**
+- \`@GitHub status\` — see your account, subscriptions and schedules.
+- Use \`@GitHub signin\` to connect or reconnect your account.
+
+Anyone in the channel can use the bot. Channel owners and administrators manage subscriptions; personal actions use your own GitHub permissions.`;
 
 export function commandText(
   message: Message,
