@@ -10,7 +10,11 @@ import type {
 } from '../../src/core/types.js';
 import { createGithubApp, commandText, tokenize } from './index.js';
 import { matchesSubscription, parseFeatures } from './subscriptions.js';
-import { deliverWebhook, formatNotification } from './notifications.js';
+import {
+  bodyPreview,
+  deliverWebhook,
+  formatNotification,
+} from './notifications.js';
 import { deliverReminders, saveReminder } from './reminders.js';
 import { previewLinks } from './previews.js';
 
@@ -65,7 +69,7 @@ afterEach(() => {
 });
 
 test.each(['edited', 'labeled', 'unlabeled', 'synchronize'])(
-  'updates the parent without a new reply for %s metadata',
+  'formats metadata without a new reply for %s',
   (action) => {
     const result = formatNotification('pull_request', {
       action,
@@ -98,8 +102,8 @@ describe('command and access boundaries', () => {
     const text = vi.mocked(context.buzz.send).mock.calls.at(-1)![1];
     expect(text).toContain('Your GitHub account is connected.');
     expect(text).not.toContain('connect or reconnect');
-    expect(text).toContain('\n- **Default notifications:**');
-    expect(text).toContain('\n- **Optional notifications:**');
+    expect(text).toContain('**Default updates:**');
+    expect(text).toContain('**Summaries and reminders**');
   });
 
   test('requires a real tagged mention, not display text', () => {
@@ -266,7 +270,7 @@ describe('notification filters and state', () => {
       }),
     ).toBe(false);
   });
-  test('webhook redelivery does not duplicate notifications and latest state edits parent', async () => {
+  test('webhook redelivery does not duplicate notifications and lifecycle preserves parent', async () => {
     const app = createGithubApp(context);
     const issue = {
       number: 1,
@@ -315,9 +319,12 @@ describe('notification filters and state', () => {
     );
     expect(context.buzz.send).toHaveBeenCalledWith(
       'channel',
-      expect.stringContaining('), closed'),
-      expect.objectContaining({ edit: 'event-1' }),
+      expect.stringContaining('**Issue closed**'),
+      expect.objectContaining({ root: 'event-1', broadcast: false }),
     );
+    expect(
+      vi.mocked(context.buzz.send).mock.calls.some((call) => call[2]?.edit),
+    ).toBe(false);
     expect(context.buzz.send).toHaveBeenCalledWith(
       'channel',
       expect.stringContaining('closed'),
@@ -968,7 +975,7 @@ test('PR presentation has one bold headline and a linked unchanged title', () =>
   });
   expect(notification?.body.match(/\*\*/g)).toHaveLength(2);
   expect(notification?.body).toContain(
-    '**PR [Keep My Title](https://github.com/example/repo/pull/7)**',
+    '**PR opened**\n[Keep My Title](https://github.com/example/repo/pull/7)',
   );
 });
 
@@ -1006,4 +1013,39 @@ test('lifecycle channel broadcast requires explicit subscription opt-in', async 
     expect.stringContaining('**Issue closed**'),
     expect.objectContaining({ root: 'original', broadcast: true }),
   );
+});
+
+test('PR preview is bounded, skips hidden template text and sits before attribution', () => {
+  expect(bodyPreview('<!-- secret template -->')).toBe('');
+  expect(bodyPreview('Short description.')).toBe('> Short description.');
+  expect(bodyPreview('A useful description '.repeat(40))).toMatch(/…$/);
+  expect(
+    bodyPreview('A useful description '.repeat(40)).length,
+  ).toBeLessThanOrEqual(322);
+  const n = formatNotification('pull_request', {
+    action: 'opened',
+    repository: { full_name: 'example/repo' },
+    pull_request: {
+      number: 9,
+      title: 'Title',
+      body: 'A useful description.',
+      state: 'open',
+      html_url: 'https://github.com/example/repo/pull/9',
+      user: { login: 'author' },
+    },
+  });
+  expect(n!.body.indexOf('> A useful description.')).toBeLessThan(
+    n!.body.indexOf('opened by'),
+  );
+  expect(n!.body).toContain('[#9](https://github.com/example/repo/pull/9)');
+});
+test('deployment success names arbitrary environments without implying publication', () => {
+  const n = formatNotification('deployment_status', {
+    repository: { full_name: 'example/repo' },
+    deployment: { id: 1, environment: 'staging', ref: 'main' },
+    deployment_status: { state: 'success' },
+  });
+  expect(n!.body).toContain('**Deployment succeeded**');
+  expect(n!.body).toContain('Environment: staging');
+  expect(n!.body).not.toContain('Status: success');
 });

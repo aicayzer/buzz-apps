@@ -34,6 +34,20 @@ export function link(value: unknown): string {
     return 'https://github.com';
   }
 }
+export function bodyPreview(value: unknown): string {
+  const text = String(value ?? '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/^[ \t]*[>#]+[ \t]*/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const excerpt =
+    text.length > 320 ? text.slice(0, 317).replace(/\s+\S*$/, '') + '…' : text;
+  return excerpt
+    ? '> ' + plain(excerpt, 400).replace(/[[\]`*_<>]/g, '\\$&')
+    : '';
+}
 export function actorLink(login: unknown): string {
   return login
     ? `[${label(login)}](${link('https://github.com/' + String(login))})`
@@ -84,7 +98,9 @@ export function formatNotification(
             ? '🟢'
             : '🔀';
     const title = `${kind} #${issue.number}: ${label(issue.title)}`;
-    const summary = `${icon} **${kind === 'Pull request' ? 'PR' : 'Issue'} [${label(issue.title)}](${link(issue.html_url)})**\n${repository} [#${issue.number}](${link(issue.html_url)}), ${label(state)}${issue.user?.login ? `, opened by ${actorLink(issue.user.login)}` : ''}${issue.labels?.length ? `\nLabels: ${issue.labels.map((item: any) => label(item.name)).join(', ')}` : ''}`;
+    const preview = kind === 'Pull request' ? bodyPreview(issue.body) : '';
+    const heading = kind === 'Pull request' ? 'PR' : 'Issue';
+    const summary = `${icon} **${heading} ${state === 'open' ? 'opened' : label(state)}**\n[${label(issue.title)}](${link(issue.html_url)})${preview ? '\n\n' + preview : ''}\n\n${repository} [#${issue.number}](${link(issue.html_url)})${issue.user?.login ? `, opened by ${actorLink(issue.user.login)}` : ''}${issue.labels?.length ? `\nLabels: ${issue.labels.map((item: any) => label(item.name)).join(', ')}` : ''}`;
     let reply: string | undefined;
     if (payload.comment)
       reply = `💬 **${actor} commented**\n\n${plain(payload.comment.body)}\n\n[View comment](${link(payload.comment.html_url)})`;
@@ -104,7 +120,7 @@ export function formatNotification(
       if (action === 'review_requested')
         reply = `👀 **Review requested**\n${actor} requested a review${payload.requested_reviewer?.login ? ' from ' + actorLink(payload.requested_reviewer.login) : payload.requested_team?.name ? ' from ' + label(payload.requested_team.name) : ''}.`;
       else
-        reply = `${icon} **${action === 'ready_for_review' ? 'Ready for review' : kind + ' ' + label(issue.merged && action === 'closed' ? 'merged' : action.replaceAll('_', ' '))}**\nBy ${actor}. [View #${issue.number}](${link(issue.html_url)})`;
+        reply = `${icon} **${action === 'ready_for_review' ? 'Ready for review' : heading + ' ' + label(issue.merged && action === 'closed' ? 'merged' : action.replaceAll('_', ' '))}**\n[#${issue.number}](${link(issue.html_url)}) ${issue.merged ? 'merged' : label(action.replaceAll('_', ' '))} by ${actor}.`;
     }
     return {
       key: `${repo}:issue:${issue.number}`,
@@ -122,7 +138,7 @@ export function formatNotification(
     return {
       key: `${repo}:push:${payload.after}`,
       title: `${count} commits`,
-      body: `📦 **${count} commit${count === 1 ? '' : 's'} pushed**\n${repository}, ${label(String(payload.ref).replace('refs/heads/', ''))}\n\n${commits.map((c: any) => `- [${String(c.id).slice(0, 7)}](${link(c.url)}) ${label(String(c.message).split('\n')[0])}`).join('\n')}${count > 8 ? '\n- ' + (count - 8) + ' more commits.' : ''}\n\nPushed by ${actor}. [Compare changes](${link(payload.compare)})`,
+      body: `📦 **${count} commit${count === 1 ? '' : 's'} pushed**\n${repository}, ${label(String(payload.ref).replace('refs/heads/', ''))}\n\n${commits.map((c: any) => `- [${String(c.id).slice(0, 7)}](${link(c.url)}) ${label(String(c.message).split('\n')[0])}`).join('\n')}${count > 8 ? '\n- ' + (count - 8) + ' more commits.' : ''}\n\nPushed by ${actor}.\n\n[Compare changes](${link(payload.compare)})`,
       url: link(payload.compare),
       logins: [],
     };
@@ -189,14 +205,14 @@ export function formatNotification(
     const state = payload.deployment_status?.state ?? 'pending';
     const heading =
       state === 'success'
-        ? 'Deployed to'
+        ? 'Deployment succeeded'
         : state === 'failure' || state === 'error'
-          ? 'Deployment failed in'
-          : 'Deploying to';
+          ? 'Deployment failed'
+          : `Deployment ${label(state)}`;
     return {
       key: `${repo}:deployment:${d.id}`,
       title: `Deployment to ${label(d.environment)}`,
-      body: `${state === 'success' ? '✅' : state === 'failure' || state === 'error' ? '❌' : '⏳'} **${heading} ${label(d.environment)}**\n${repository}\n\n- Ref: ${label(d.ref)}\n- Status: ${label(state)}${payload.deployment_status?.description ? '\n- ' + plain(payload.deployment_status.description) : ''}\n\n[View deployment](${link('https://github.com/' + repo + '/deployments')})`,
+      body: `${state === 'success' ? '✅' : state === 'failure' || state === 'error' ? '❌' : '⏳'} **${heading}**\n${repository}\n\n- Ref: ${label(d.ref)}\n- Environment: ${label(d.environment)}${payload.deployment_status?.description ? '\n- ' + plain(payload.deployment_status.description) : ''}\n\n[View deployment](${link('https://github.com/' + repo + '/deployments')})`,
       url: `https://github.com/${repo}/deployments`,
       logins: [],
     };
@@ -381,7 +397,10 @@ export async function deliverWebhook(
         id: parentId,
         body: notification.body,
       });
-    } else if (existing.body !== notification.body) {
+    } else if (
+      existing.body !== notification.body &&
+      !notification.key.includes(':issue:')
+    ) {
       await context.buzz.send(subscription.channel, notification.body, {
         edit: existing.id,
         mentions: [],

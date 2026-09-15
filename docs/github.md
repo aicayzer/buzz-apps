@@ -35,6 +35,8 @@ The defaults are issues, pull requests, commits to the default branch, releases 
 | Branches                 | Optional branch creation and deletion messages.                                                                                                                                                                         |
 | Discussions              | Optional discussion updates and comments.                                                                                                                                                                               |
 
+Related PR and issue updates stay in the original thread by default. The opening message retains its original state; later reviews, comments and lifecycle changes appear as replies. PR messages include a short description excerpt and a linked PR number. Channel broadcasts are optional.
+
 `@GitHub settings` opens a private browser link for threading, lifecycle broadcasts, review broadcasts, comment broadcasts and previews. Subscription filters remain available through commands.
 
 ## Act as yourself

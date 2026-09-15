@@ -34,6 +34,7 @@ export interface FormHandler {
   isPreview?(record: LinkRecord, values: Record<string, string>): boolean;
   fields(record: LinkRecord): Promise<{
     title: string;
+    description?: string;
     fields: FormField[];
     links?: { label: string; url: string }[];
   }>;
@@ -202,8 +203,10 @@ export class WebFlows {
         .type('text/html')
         .send(
           page(
-            'Continue with GitHub',
-            `<p>Connect your GitHub account to this Buzz identity to ${record.purpose === 'signin' ? 'sign in' : 'continue'}. This link expires shortly.</p><form method="post"><button>Continue to GitHub</button></form>`,
+            record.purpose === 'signin'
+              ? 'Connect GitHub'
+              : 'Open GitHub settings and tools',
+            `<p>${record.purpose === 'signin' ? 'Connect your GitHub account to Buzz.' : 'Confirm your GitHub identity to continue securely. You may already be signed in.'}</p><form method="post"><button>Continue</button></form>`,
           ),
         );
     });
@@ -334,7 +337,9 @@ export class WebFlows {
       return reply.type('text/html').send(
         page(
           form.title,
-          `${(form.links ?? [])
+          `${form.description ? `<p>${escapeHtml(form.description)}</p>` : ''}${(
+            form.links ?? []
+          )
             .map((link) => {
               const url = new URL(link.url, ctx.config.publicUrl);
               if (!['http:', 'https:'].includes(url.protocol))
