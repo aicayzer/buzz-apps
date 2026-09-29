@@ -11,7 +11,11 @@ import type {
 import type { FormHandler, LinkRecord } from '../../src/core/web.js';
 import type { GithubApp } from './index.js';
 import { reminderText, validateReminder, type Reminder } from './reminders.js';
-import { subscriptionKey, targetParts } from './subscriptions.js';
+import {
+  describeSubscription,
+  subscriptionKey,
+  targetParts,
+} from './subscriptions.js';
 
 type Form = Awaited<ReturnType<FormHandler['fields']>>;
 type Field = Form['fields'][number];
@@ -242,7 +246,7 @@ export function createGithubForms(
             fields: [],
             links: await Promise.all(
               subscriptions.map(async (sub) => ({
-                label: sub.target,
+                label: `${sub.target}: ${describeSubscription(sub)}`,
                 url: await ctx.link!('settings', message, {
                   target: sub.target,
                 }),
@@ -254,6 +258,7 @@ export function createGithubForms(
         const subscription = selectedSubscription(ctx, message, target);
         return {
           title: `Settings for ${subscription.target}`,
+          description: describeSubscription(subscription),
           fields: [
             {
               name: 'target',

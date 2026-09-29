@@ -20,6 +20,7 @@ import type {
 import { GithubApi, friendlyError } from './api.js';
 import {
   DEFAULT_FEATURES,
+  describeSubscription,
   parseFeatures,
   subscriptionKey,
   targetParts,
@@ -32,6 +33,8 @@ export const HELP = `**Repository notifications**
 - \`@GitHub subscribe OWNER/REPO\` — follow a repository here.
 - \`@GitHub unsubscribe OWNER/REPO\` — stop following it.
 - \`@GitHub settings\` — choose notification options.
+
+- \`@GitHub subscribe OWNER/REPO workflows:{name:CI,event:schedule,conclusion:failure}\` — only failed scheduled CI runs.
 
 **Default updates:** issues, PRs, default-branch commits, releases and deployments.
 Updates posted here are visible to everyone in this channel.
@@ -50,7 +53,7 @@ Updates posted here are visible to everyone in this channel.
 - \`@GitHub status\` — see your account, subscriptions and schedules.
 - Use \`@GitHub signin\` to connect or reconnect your account.
 
-Anyone in the channel can use the bot. Channel owners and administrators manage subscriptions; personal actions use your own GitHub permissions.`;
+Add the GitHub bot to the channel before mentioning it. Anyone in the channel can use the bot. Channel owners and administrators manage subscriptions; personal actions use your own GitHub permissions.`;
 
 export function commandText(
   message: Message,
@@ -218,7 +221,7 @@ export class GithubApp implements BuzzApp {
           ? list
               .map(
                 (sub) =>
-                  `- ${repoLink(sub.target)}${tokens[1] === 'features' ? `: ${sub.features.join(', ')}${Object.keys(sub.settings.filters ?? {}).length ? `; filters: ${JSON.stringify(sub.settings.filters)}` : ''}` : ''}`,
+                  `- ${repoLink(sub.target)}: ${describeSubscription(sub)}`,
               )
               .join('\n')
           : 'This channel has no GitHub subscriptions.',
