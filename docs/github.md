@@ -60,7 +60,7 @@ A lost response to a write is treated as uncertain. The service journals the ope
 
 ## Previews and reminders
 
-Pasted GitHub links can show repositories, user and organisation profiles, issues, pull requests, comments, reviews and selected code lines. Public previews can work without a linked account. Private previews use the posting person's access. A private preview appears in a channel only when the repository is covered by an enabled subscription; otherwise it goes privately to the sender. There are at most three previews per message and forty code lines per preview. Buzz’s explicit `link-preview: none` preference is honoured. Quoted examples, fenced or indented code, and inline code do not trigger automatic previews.
+Bare repository links do not generate replies. Pasted GitHub links can show user and organisation profiles, issues, pull requests, comments, reviews and selected code lines. Public previews can work without a linked account. Private previews use the posting person's access. A private preview appears in a channel only when the repository is covered by an enabled subscription; otherwise it goes privately to the sender. There are at most three previews per message and forty code lines per preview. Buzz’s explicit `link-preview: none` preference is honoured. Quoted examples, fenced or indented code, and inline code do not trigger automatic previews.
 
 ```text
 @GitHub reminders

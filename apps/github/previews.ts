@@ -25,7 +25,13 @@ export async function previewLinks(
         /https:\/\/github\.com\/[^\s<>\])]+/g,
       ) ?? [],
     ),
-  ].slice(0, 3);
+  ]
+    // A repository URL is already useful without a name/description reply.
+    // Exclude it before the cap so it cannot crowd out issue or PR previews.
+    .filter(
+      (raw) => new URL(raw).pathname.split('/').filter(Boolean).length !== 2,
+    )
+    .slice(0, 3);
   for (const raw of urls) {
     const url = new URL(raw);
     const parts = url.pathname.split('/').filter(Boolean);
@@ -140,9 +146,7 @@ export async function previewLinks(
             .slice(0, 3000)
             .replace(/```/g, '` ` `');
           body = `[${label(target)}/${label(path)}](${link(raw)})\n\n\`\`\`\n${snippet}\n\`\`\``;
-        } else if (!kind)
-          body = `[${label(repository.full_name)}](${link(repository.html_url)})${repository.description ? `\n${plain(repository.description, 500)}` : ''}`;
-        else continue;
+        } else continue;
       }
       if (privateRepo && !subscription)
         await context.buzz.dm(message.author, body, {

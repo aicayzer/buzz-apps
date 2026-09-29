@@ -349,6 +349,10 @@ describe('private preview and reminders', () => {
     const app = createGithubApp(context);
     const request = vi.fn().mockResolvedValue({
       data: {
+        number: 1,
+        title: 'Issue',
+        state: 'open',
+        body: 'Private description',
         private: true,
         full_name: 'example/repo',
         html_url: 'https://github.com/example/repo',
@@ -359,7 +363,7 @@ describe('private preview and reminders', () => {
     await previewLinks(
       context,
       app.api,
-      { ...message, content: 'https://github.com/example/repo' },
+      { ...message, content: 'https://github.com/example/repo/issues/1' },
       [],
     );
     expect(context.buzz.send).not.toHaveBeenCalled();
@@ -373,6 +377,10 @@ describe('private preview and reminders', () => {
     const app = createGithubApp(context);
     const request = vi.fn().mockResolvedValue({
       data: {
+        number: 1,
+        title: 'Issue',
+        state: 'open',
+        body: 'Private description',
         private: true,
         full_name: 'example/repo',
         html_url: 'https://github.com/example/repo',
@@ -382,7 +390,7 @@ describe('private preview and reminders', () => {
     await previewLinks(
       context,
       app.api,
-      { ...message, content: 'https://github.com/example/repo' },
+      { ...message, content: 'https://github.com/example/repo/issues/1' },
       [sub],
     );
     expect(context.buzz.send).toHaveBeenCalledTimes(1);
@@ -602,6 +610,10 @@ describe('organisation approval and webhook replay', () => {
     const app = createGithubApp(context);
     const request = vi.fn().mockResolvedValue({
       data: {
+        number: 1,
+        title: 'Issue',
+        state: 'open',
+        body: 'Private description',
         private: true,
         full_name: 'example/secret',
         html_url: 'https://github.com/example/secret',
@@ -611,7 +623,7 @@ describe('organisation approval and webhook replay', () => {
     await previewLinks(
       context,
       app.api,
-      { ...message, content: 'https://github.com/example/secret' },
+      { ...message, content: 'https://github.com/example/secret/issues/1' },
       [
         {
           ...sub,
@@ -1049,3 +1061,49 @@ test('deployment success names arbitrary environments without implying publicati
   expect(n!.body).toContain('Environment: staging');
   expect(n!.body).not.toContain('Status: success');
 });
+
+test.each(['', '/', '?tab=readme', '#readme', '/?tab=readme#readme'])(
+  'bare repository links stay silent with suffix %s',
+  async (suffix) => {
+    const app = createGithubApp(context);
+    const reader = vi.spyOn(app.api, 'reader');
+    await app.onMessage({
+      ...message,
+      tags: [],
+      content: `https://github.com/example/repo${suffix}`,
+    });
+    expect(reader).not.toHaveBeenCalled();
+    expect(context.buzz.send).not.toHaveBeenCalled();
+    expect(context.buzz.dm).not.toHaveBeenCalled();
+  },
+);
+
+test.each(['issues', 'pull'])(
+  'repository links do not crowd out a %s preview',
+  async (kind) => {
+    const app = createGithubApp(context);
+    const request = vi.fn().mockResolvedValue({
+      data: {
+        private: false,
+        full_name: 'example/repo',
+        number: 7,
+        title: 'Useful change',
+        state: 'open',
+        body: 'Details',
+        html_url: `https://github.com/example/repo/${kind}/7`,
+      },
+    });
+    vi.spyOn(app.api, 'reader').mockResolvedValue({ request } as any);
+    await app.onMessage({
+      ...message,
+      tags: [],
+      content: `https://github.com/example/a https://github.com/example/b https://github.com/example/c https://github.com/example/repo/${kind}/7`,
+    });
+    expect(context.buzz.send).toHaveBeenCalledTimes(1);
+    expect(context.buzz.send).toHaveBeenCalledWith(
+      'channel',
+      expect.stringContaining('#7: Useful change'),
+      expect.objectContaining({ root: message.id }),
+    );
+  },
+);
