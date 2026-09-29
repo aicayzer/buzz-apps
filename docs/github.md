@@ -13,6 +13,7 @@ A channel owner or administrator can subscribe:
 @GitHub subscribe OWNER
 @GitHub subscribe OWNER/REPO reviews comments
 @GitHub subscribe OWNER/REPO commits:release/*
+@GitHub subscribe OWNER/REPO tags:v*
 @GitHub subscribe OWNER/REPO +label:"ready for review"
 @GitHub subscribe OWNER/REPO workflows:{name:CI,event:push,branch:main}
 @GitHub subscribe list features
@@ -32,6 +33,7 @@ The defaults are issues, pull requests, commits to the default branch, releases 
 | Workflows                | Run status updates edit one parent. Unfiltered subscriptions show pull request runs targeting the default branch. Name, event, branch, actor and conclusion filters are supported. Conclusion filters require a completed run. |
 | Releases                 | Published releases, including prereleases.                                                                                                                                                                                     |
 | Deployments              | Environment, ref and latest deployment status.                                                                                                                                                                                 |
+| Tags                     | Optional tag-creation messages. Use `tags:v*` to match version tags, or `tags` for all tags. These announce tag creation, not build success or TestFlight availability.                                                        |
 | Branches                 | Optional branch creation and deletion messages.                                                                                                                                                                                |
 | Discussions              | Optional discussion updates and comments.                                                                                                                                                                                      |
 

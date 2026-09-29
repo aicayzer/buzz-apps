@@ -15,10 +15,12 @@ export const FEATURES = [
   'reviews',
   'comments',
   'branches',
+  'tags',
   'discussions',
 ];
 export type Filters = {
   branches?: string[];
+  tags?: string[];
   label?: string;
   workflow?: string[];
   event?: string[];
@@ -90,6 +92,14 @@ export function parseFeatures(tokens: string[]): {
       features.push(token);
       continue;
     }
+    if (token.startsWith('tags:')) {
+      const patterns = token.slice(5).split(',');
+      if (patterns.some((pattern) => !pattern))
+        throw new GithubInputError('Provide a tag pattern after tags:.');
+      features.push('tags');
+      filters.tags = patterns;
+      continue;
+    }
     if (token.startsWith('commits:')) {
       features.push('commits');
       filters.branches = token.slice(8).split(',');
@@ -118,7 +128,7 @@ export function parseFeatures(tokens: string[]): {
       continue;
     }
     throw new GithubInputError(
-      `Unknown feature or filter: ${token}. Features: ${FEATURES.join(', ')}. Filters: commits:BRANCH, +label:LABEL, name=WORKFLOW, event=EVENT, branch=BRANCH, actor=LOGIN, conclusion=failure,timed_out.`,
+      `Unknown feature or filter: ${token}. Features: ${FEATURES.join(', ')}. Filters: tags:PATTERN, commits:BRANCH, +label:LABEL, name=WORKFLOW, event=EVENT, branch=BRANCH, actor=LOGIN, conclusion=failure,timed_out.`,
     );
   }
   if (
@@ -169,7 +179,7 @@ export function matchesSubscription(
       pull_request_review: 'reviews',
       pull_request_review_comment: 'comments',
       issue_comment: 'comments',
-      create: 'branches',
+      create: payload.ref_type === 'tag' ? 'tags' : 'branches',
       delete: 'branches',
       discussion: 'discussions',
       discussion_comment: 'discussions',
@@ -178,7 +188,8 @@ export function matchesSubscription(
   if (!feature || !subscription.features.includes(feature)) return false;
   if (
     (event === 'create' || event === 'delete') &&
-    payload.ref_type !== 'branch'
+    payload.ref_type !== 'branch' &&
+    !(event === 'create' && payload.ref_type === 'tag')
   )
     return false;
   if (
@@ -187,6 +198,14 @@ export function matchesSubscription(
   )
     return false;
   const filters = (subscription.settings.filters ?? {}) as Filters;
+  if (event === 'create' && payload.ref_type === 'tag') {
+    if (typeof payload.ref !== 'string' || !payload.ref) return false;
+    if (
+      filters.tags &&
+      !filters.tags.some((pattern) => picomatch.isMatch(payload.ref, pattern))
+    )
+      return false;
+  }
   const item = payload.pull_request ?? payload.issue ?? payload.discussion;
   if (
     filters.label &&

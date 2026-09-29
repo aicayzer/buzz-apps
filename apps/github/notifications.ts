@@ -217,6 +217,16 @@ export function formatNotification(
       logins: [],
     };
   }
+  if (event === 'create' && payload.ref_type === 'tag') {
+    const url = `https://github.com/${repo}/tree/${encodeURIComponent(String(payload.ref))}`;
+    return {
+      key: `${repo}:tag:${payload.ref}`,
+      title: `${label(payload.ref)} tagged`,
+      body: `**${label(payload.ref)} tagged**\n${repository}\n\n[View tag](${link(url)})\nCreated by ${actor}.`,
+      url,
+      logins: [],
+    };
+  }
   if (event === 'create' || event === 'delete')
     return {
       key: `${repo}:branch:${payload.ref}:${event}:${payload.sender?.id}`,
