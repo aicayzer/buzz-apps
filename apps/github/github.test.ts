@@ -1107,3 +1107,188 @@ test.each(['issues', 'pull'])(
     );
   },
 );
+
+describe('workflow conclusion filters', () => {
+  const filters = {
+    workflow: ['CI'],
+    event: ['schedule'],
+    conclusion: ['failure', 'timed_out'],
+  };
+  const subscription = {
+    ...sub,
+    features: ['workflows'],
+    settings: { filters },
+  };
+  const payload = (status: string, conclusion: string | null) => ({
+    repository: { full_name: 'example/repo' },
+    workflow_run: {
+      id: 42,
+      name: 'CI',
+      event: 'schedule',
+      status,
+      conclusion,
+      html_url: 'https://github.com/example/repo/actions/runs/42',
+      head_branch: 'main',
+      run_number: 42,
+      actor: { login: 'example' },
+    },
+  });
+  test.each([
+    ['workflows', 'name=CI', 'event=schedule', 'conclusion=failure,timed_out'],
+    ['workflows:{name:CI,event:schedule,conclusion:failure,timed_out}'],
+  ])('parses supported syntax %j', (...tokens) => {
+    expect(parseFeatures(tokens)).toEqual({ features: ['workflows'], filters });
+  });
+  test.each([
+    'conclusion=bogus',
+    'conclusion=failure,bogus',
+    'workflows:{conclusion:bogus}',
+    'workflows:{conclusion:}',
+  ])('rejects invalid result %s', (token) => {
+    expect(() => parseFeatures([token])).toThrow(
+      /Valid values:.*failure.*timed_out/,
+    );
+  });
+  test.each([
+    ['completed', 'failure', true],
+    ['completed', 'timed_out', true],
+    ['completed', 'success', false],
+    ['in_progress', null, false],
+    ['queued', null, false],
+    ['in_progress', 'failure', false],
+  ])('matches %s / %s: %s', (status, conclusion, expected) => {
+    expect(
+      matchesSubscription(
+        subscription,
+        'workflow_run',
+        payload(status, conclusion),
+      ),
+    ).toBe(expected);
+  });
+  test('result-only filter is not restricted to default PR runs', () => {
+    expect(
+      matchesSubscription(
+        { ...subscription, settings: { filters: { conclusion: ['failure'] } } },
+        'workflow_run',
+        payload('completed', 'failure'),
+      ),
+    ).toBe(true);
+  });
+  test('webhook delivery stays quiet until a matching completed result', async () => {
+    const app = createGithubApp(context);
+    await deliverWebhook(
+      context,
+      app.api,
+      [subscription],
+      'workflow_run',
+      payload('queued', null),
+      'queued',
+    );
+    await deliverWebhook(
+      context,
+      app.api,
+      [subscription],
+      'workflow_run',
+      payload('in_progress', null),
+      'running',
+    );
+    await deliverWebhook(
+      context,
+      app.api,
+      [subscription],
+      'workflow_run',
+      payload('completed', 'success'),
+      'success',
+    );
+    expect(context.buzz.send).not.toHaveBeenCalled();
+    await deliverWebhook(
+      context,
+      app.api,
+      [subscription],
+      'workflow_run',
+      payload('completed', 'failure'),
+      'failed',
+    );
+    expect(context.buzz.send).toHaveBeenCalledTimes(1);
+  });
+  test('unfiltered lifecycle edits one parent and redelivery stays quiet', async () => {
+    const app = createGithubApp(context);
+    const all = {
+      ...subscription,
+      settings: { filters: { workflow: ['CI'] } },
+    };
+    await deliverWebhook(
+      context,
+      app.api,
+      [all],
+      'workflow_run',
+      payload('queued', null),
+      'queued',
+    );
+    await deliverWebhook(
+      context,
+      app.api,
+      [all],
+      'workflow_run',
+      payload('in_progress', null),
+      'running',
+    );
+    await deliverWebhook(
+      context,
+      app.api,
+      [all],
+      'workflow_run',
+      payload('completed', 'failure'),
+      'failed',
+    );
+    await deliverWebhook(
+      context,
+      app.api,
+      [all],
+      'workflow_run',
+      payload('completed', 'failure'),
+      'failed',
+    );
+    const calls = vi.mocked(context.buzz.send).mock.calls;
+    expect(calls).toHaveLength(3);
+    expect(calls[0][2]?.edit).toBeUndefined();
+    expect(calls[1][2]?.edit).toBe('event-1');
+    expect(calls[2][2]?.edit).toBe('event-1');
+  });
+  test('refreshed rerun state cannot bypass the conclusion filter', async () => {
+    const app = createGithubApp(context);
+    vi.spyOn(app.api, 'installation').mockResolvedValue({
+      request: vi
+        .fn()
+        .mockResolvedValue({ data: payload('in_progress', null).workflow_run }),
+    } as any);
+    const stale = payload('completed', 'failure');
+    await deliverWebhook(
+      context,
+      app.api,
+      [subscription],
+      'workflow_run',
+      {
+        ...stale,
+        repository: {
+          ...stale.repository,
+          name: 'repo',
+          owner: { login: 'example' },
+        },
+      },
+      'stale',
+    );
+    expect(context.buzz.send).not.toHaveBeenCalled();
+  });
+  test('subscription list includes readable features and filters', async () => {
+    store.set('subscriptions', 'channel:example/repo', subscription);
+    await createGithubApp(context).subscribe(message, ['list']);
+    expect(context.buzz.send).toHaveBeenCalledWith(
+      'channel',
+      expect.stringContaining(
+        'workflows; workflow=CI; event=schedule; conclusion=failure,timed_out',
+      ),
+      expect.anything(),
+    );
+  });
+});

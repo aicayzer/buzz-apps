@@ -23,7 +23,27 @@ export type Filters = {
   workflow?: string[];
   event?: string[];
   actor?: string[];
+  conclusion?: string[];
 };
+export const WORKFLOW_CONCLUSIONS = [
+  'action_required',
+  'cancelled',
+  'failure',
+  'neutral',
+  'skipped',
+  'stale',
+  'startup_failure',
+  'success',
+  'timed_out',
+];
+export function describeSubscription(subscription: Subscription): string {
+  const filters = (subscription.settings.filters ?? {}) as Filters;
+  const details = Object.entries(filters).map(
+    ([key, value]) =>
+      `${key}=${Array.isArray(value) ? value.join(',') : value}`,
+  );
+  return [subscription.features.join(', '), ...details].join('; ');
+}
 export const subscriptionKey = (channel: string, target: string) =>
   `${channel}:${target.toLowerCase()}`;
 export function targetParts(target: string): { owner: string; repo?: string } {
@@ -44,12 +64,12 @@ export function parseFeatures(tokens: string[]): {
       const inner = token.slice(11, -1);
       const parts = [
         ...inner.matchAll(
-          /(?:^|,)\s*(name|event|branch|actor)\s*:\s*(.*?)(?=,\s*(?:name|event|branch|actor)\s*:|$)/g,
+          /(?:^|,)\s*(name|event|branch|actor|conclusion)\s*:\s*(.*?)(?=,\s*(?:name|event|branch|actor|conclusion)\s*:|$)/g,
         ),
       ];
       if (!parts.length)
         throw new GithubInputError(
-          'Workflow filters use workflows:{name:CI,event:push,branch:main,actor:LOGIN}.',
+          'Workflow filters use workflows:{name:CI,event:push,branch:main,actor:LOGIN,conclusion:failure}.',
         );
       for (const match of parts) {
         const key = {
@@ -57,6 +77,7 @@ export function parseFeatures(tokens: string[]): {
           event: 'event',
           branch: 'branches',
           actor: 'actor',
+          conclusion: 'conclusion',
         }[match[1]] as keyof Filters;
         (filters as Record<string, unknown>)[key] = match[2]
           .split(',')
@@ -81,7 +102,9 @@ export function parseFeatures(tokens: string[]): {
       continue;
     }
     const match =
-      /^(?:workflows:)?(name|workflow|event|branch|actor)=(.+)$/.exec(token);
+      /^(?:workflows:)?(name|workflow|event|branch|actor|conclusion)=(.+)$/.exec(
+        token,
+      );
     if (match) {
       const key = {
         name: 'workflow',
@@ -89,12 +112,22 @@ export function parseFeatures(tokens: string[]): {
         event: 'event',
         branch: 'branches',
         actor: 'actor',
+        conclusion: 'conclusion',
       }[match[1]] as keyof Filters;
       (filters as Record<string, unknown>)[key] = match[2].split(',');
       continue;
     }
     throw new GithubInputError(
-      `Unknown feature or filter: ${token}. Features: ${FEATURES.join(', ')}. Filters: commits:BRANCH, +label:LABEL, name=WORKFLOW, event=EVENT, branch=BRANCH, actor=LOGIN.`,
+      `Unknown feature or filter: ${token}. Features: ${FEATURES.join(', ')}. Filters: commits:BRANCH, +label:LABEL, name=WORKFLOW, event=EVENT, branch=BRANCH, actor=LOGIN, conclusion=failure,timed_out.`,
+    );
+  }
+  if (
+    filters.conclusion &&
+    (!filters.conclusion.length ||
+      filters.conclusion.some((value) => !WORKFLOW_CONCLUSIONS.includes(value)))
+  ) {
+    throw new GithubInputError(
+      `Invalid workflow conclusion. Valid values: ${WORKFLOW_CONCLUSIONS.join(', ')}.`,
     );
   }
   return { features: [...new Set(features)], filters };
@@ -175,6 +208,12 @@ export function matchesSubscription(
     const run = payload.workflow_run;
     if (!run) return false;
     if (
+      filters.conclusion &&
+      (run.status !== 'completed' ||
+        !filters.conclusion.includes(run.conclusion))
+    )
+      return false;
+    if (
       filters.branches &&
       !filters.branches.some((pattern) =>
         picomatch.isMatch(run.head_branch ?? '', pattern),
@@ -193,7 +232,8 @@ export function matchesSubscription(
       !filters.branches &&
       !filters.workflow &&
       !filters.event &&
-      !filters.actor
+      !filters.actor &&
+      !filters.conclusion
     ) {
       if (
         run.event !== 'pull_request' ||

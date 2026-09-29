@@ -373,6 +373,8 @@ export async function deliverWebhook(
   }
   const seenChannels = new Set<string>();
   for (const subscription of matching) {
+    // A delayed webhook may now refer to a rerun with a different result.
+    if (!matchesSubscription(subscription, event, current)) continue;
     if (seenChannels.has(subscription.channel)) continue;
     seenChannels.add(subscription.channel);
     const deliveryKey = `${subscription.channel}:${delivery}`;

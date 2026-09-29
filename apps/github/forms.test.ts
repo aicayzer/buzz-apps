@@ -121,8 +121,8 @@ test('multiple subscriptions require choosing one before displaying or changing 
   const form = await forms.fields(record('settings'));
   expect(form.fields).toEqual([]);
   expect(form.links?.map((link) => link.label)).toEqual([
-    'example/other',
-    'example/repo',
+    'example/other: issues',
+    'example/repo: issues',
   ]);
   await expect(
     forms.submit(record('settings'), {
