@@ -1292,3 +1292,102 @@ describe('workflow conclusion filters', () => {
     );
   });
 });
+
+describe('tag notifications', () => {
+  const payload = {
+    ref_type: 'tag',
+    ref: 'v1.2.3',
+    repository: { full_name: 'example/repo', private: false },
+    sender: { login: 'author', id: 1 },
+  };
+  const tags = {
+    ...sub,
+    features: ['tags'],
+    settings: { filters: { tags: ['v*'] } },
+  };
+  test('parses independent tag patterns and rejects empty filters', () => {
+    expect(parseFeatures(['tags:v*,release/*'])).toEqual({
+      features: ['tags'],
+      filters: { tags: ['v*', 'release/*'] },
+    });
+    expect(() => parseFeatures(['tags:'])).toThrow('tag pattern');
+    expect(() => parseFeatures(['tags:v*,'])).toThrow('tag pattern');
+  });
+  test('only matches subscribed tag creations and the configured patterns', () => {
+    expect(matchesSubscription(tags, 'create', payload)).toBe(true);
+    expect(
+      matchesSubscription(tags, 'create', { ...payload, ref: 'preview' }),
+    ).toBe(false);
+    expect(
+      matchesSubscription(tags, 'create', { ...payload, ref_type: 'branch' }),
+    ).toBe(false);
+    expect(matchesSubscription(tags, 'delete', payload)).toBe(false);
+    expect(
+      matchesSubscription(
+        { ...sub, features: ['branches'] },
+        'create',
+        payload,
+      ),
+    ).toBe(false);
+    expect(
+      matchesSubscription(
+        { ...sub, features: ['releases'] },
+        'create',
+        payload,
+      ),
+    ).toBe(false);
+    expect(matchesSubscription(tags, 'create', { ...payload, ref: '' })).toBe(
+      false,
+    );
+    expect(
+      matchesSubscription(tags, 'create', {
+        ...payload,
+        repository: { full_name: 'other/repo' },
+      }),
+    ).toBe(false);
+    expect(
+      matchesSubscription({ ...sub, features: ['tags'] }, 'create', {
+        ...payload,
+        ref: 'preview',
+      }),
+    ).toBe(true);
+  });
+  test('announces the tag without claiming build or distribution success', () => {
+    const note = formatNotification('create', {
+      ...payload,
+      ref: 'release/v1',
+    });
+    expect(note?.body).toContain('release/v1 tagged');
+    expect(note?.url).toBe('https://github.com/example/repo/tree/release%2Fv1');
+    expect(note?.body).not.toMatch(/TestFlight|succeeded|available/);
+    expect(
+      formatNotification('create', { ...payload, ref_type: 'branch' })?.title,
+    ).toBe('Branch updated');
+  });
+  test('delivers through Github and deduplicates webhook redelivery', async () => {
+    await deliverWebhook(
+      context,
+      {} as any,
+      [tags],
+      'create',
+      payload,
+      'tag-delivery',
+    );
+    await deliverWebhook(
+      context,
+      {} as any,
+      [tags],
+      'create',
+      payload,
+      'tag-delivery',
+    );
+    expect(context.buzz.send).toHaveBeenCalledTimes(1);
+    expect(context.buzz.send).toHaveBeenCalledWith(
+      'channel',
+      expect.stringContaining('v1.2.3 tagged'),
+      expect.objectContaining({
+        dedupKey: 'github:channel:tag-delivery:parent',
+      }),
+    );
+  });
+});
